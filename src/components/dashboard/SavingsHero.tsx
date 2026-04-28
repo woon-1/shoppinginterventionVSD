@@ -1,8 +1,5 @@
 "use client";
 
-import { Sparkles, Target } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import { formatCurrency } from "@/lib/format";
 import { SavingsLedger, UserConfig } from "@/lib/types";
 
@@ -17,41 +14,65 @@ export function SavingsHero({ savings, config }: Props) {
     ? Math.min(100, Math.round((savings.totalSaved / goal.amount) * 100))
     : null;
 
+  // Split currency into dollars and cents for editorial layout
+  const dollars = Math.floor(savings.totalSaved);
+  const cents = Math.round((savings.totalSaved - dollars) * 100);
+  const centsStr = String(cents).padStart(2, "0");
+
   return (
-    <Card className="overflow-hidden">
-      <CardContent className="space-y-3 py-6">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Sparkles className="size-4 text-primary" />
-          Total saved by not buying
+    <section className="relative overflow-hidden rounded-2xl border border-rule bg-gradient-to-br from-paper-deep via-paper to-accent-soft/50 p-8 md:p-10">
+      <div className="space-y-5">
+        <div className="flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.22em] text-ink-subtle">
+          <span className="size-1 rounded-full bg-[oklch(0.55_0.10_35)]" />
+          Saved by not buying
         </div>
-        <div className="font-mono text-4xl font-semibold tracking-tight">
-          {formatCurrency(savings.totalSaved)}
+
+        <div className="flex items-baseline gap-1 font-heading tracking-tight text-ink num-tabular">
+          <span className="self-start pt-3 text-2xl font-medium text-ink-muted md:pt-4 md:text-3xl">
+            $
+          </span>
+          <span className="text-[64px] leading-none md:text-[88px]">
+            {dollars.toLocaleString()}
+          </span>
+          <span className="self-start pt-3 text-2xl font-medium text-ink-muted md:pt-5 md:text-3xl">
+            .{centsStr}
+          </span>
         </div>
+
+        <p className="max-w-md text-sm leading-relaxed text-ink-muted">
+          {savings.totalSaved === 0
+            ? "When you save items for 24 hours and don't return to buy them, the amount you didn't spend appears here."
+            : `From ${savings.longestSkipStreak === 0 ? 0 : savings.longestSkipStreak} skip${savings.longestSkipStreak === 1 ? "" : "s"} so far. Quietly accumulating.`}
+        </p>
+
         {goal && goalPct !== null && (
-          <div className="space-y-1.5 pt-1">
-            <div className="flex items-center justify-between text-sm">
-              <span className="flex items-center gap-1.5 text-muted-foreground">
-                <Target className="size-3.5" />
+          <div className="space-y-2 pt-2">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-heading italic text-ink">
                 {goal.label}
               </span>
-              <span className="font-mono">
-                {formatCurrency(savings.totalSaved)} /{" "}
+              <span className="font-mono num-tabular text-ink-subtle">
+                {formatCurrency(savings.totalSaved)}{" "}
+                <span className="text-ink-subtle/60">/</span>{" "}
                 {formatCurrency(goal.amount)}
               </span>
             </div>
-            <Progress value={goalPct} />
-            <p className="text-xs text-muted-foreground">
-              {goalPct}% of goal reached.
+            <div className="relative h-px w-full bg-rule">
+              <div
+                className="absolute inset-y-0 left-0 h-px bg-[oklch(0.55_0.10_35)]"
+                style={{ width: `${goalPct}%` }}
+              />
+              <div
+                className="absolute -top-[3px] size-2 -translate-x-1/2 rounded-full bg-[oklch(0.55_0.10_35)]"
+                style={{ left: `${goalPct}%` }}
+              />
+            </div>
+            <p className="text-[11px] uppercase tracking-[0.2em] text-ink-subtle">
+              {goalPct}% of goal
             </p>
           </div>
         )}
-        {!goal && savings.totalSaved === 0 && (
-          <p className="text-sm text-muted-foreground">
-            When you save items for 24 hours and don&apos;t buy them, the amount
-            you didn&apos;t spend shows up here.
-          </p>
-        )}
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   );
 }

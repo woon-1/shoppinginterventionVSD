@@ -19,23 +19,28 @@ export default function DashboardPage() {
   }, [hydrated, state.config, router]);
 
   if (!hydrated || !state.config?.onboardingComplete) {
-    return <p className="py-10 text-sm text-muted-foreground">Loading…</p>;
+    return <p className="py-10 text-sm text-ink-subtle">Loading…</p>;
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-        <p className="text-sm text-muted-foreground">
-          Your savings, streak, and what&apos;s in the cooling-off queue.
-        </p>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <SavingsHero savings={state.savings} config={state.config} />
-        <div className="grid gap-4">
-          <SkipStreakCard savings={state.savings} />
+    <div className="space-y-12">
+      <header className="max-w-2xl space-y-2">
+        <div className="text-[11px] font-medium uppercase tracking-[0.22em] text-ink-subtle">
+          The dashboard
         </div>
+        <h1 className="font-heading text-4xl leading-tight tracking-tight text-ink md:text-5xl">
+          What you didn&apos;t buy.
+        </h1>
+        <p className="font-heading text-lg italic text-ink-muted">
+          Quiet credit for the purchases you let go.
+        </p>
+      </header>
+
+      <div className="grid gap-5 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <SavingsHero savings={state.savings} config={state.config} />
+        </div>
+        <SkipStreakCard savings={state.savings} />
       </div>
 
       <WeeklyChart savings={state.savings} />
