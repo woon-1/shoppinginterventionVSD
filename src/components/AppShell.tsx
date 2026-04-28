@@ -29,52 +29,28 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       ? remainingBudget(state.config, state.purchases)
       : null;
   const cartCount = state.cart.reduce((sum, l) => sum + l.qty, 0);
-
-  let healthDot: "sage" | "sand" | "alert" = "sage";
-  if (remaining !== null && budgetAmount > 0) {
-    const pctLeft = remaining / budgetAmount;
-    if (pctLeft <= 0) healthDot = "alert";
-    else if (pctLeft <= 0.25) healthDot = "sand";
-  }
+  const spent =
+    remaining !== null && budgetAmount > 0 ? budgetAmount - remaining : 0;
+  const spentPct =
+    remaining !== null && budgetAmount > 0
+      ? Math.min(100, Math.round((spent / budgetAmount) * 100))
+      : 0;
 
   return (
     <div className="flex min-h-full flex-col">
-      <header className="sticky top-0 z-30 border-b border-rule bg-paper/85 backdrop-blur-md">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-5">
+      <header className="sticky top-0 z-30 border-b border-ink-4 bg-paper">
+        <div className="mx-auto flex h-12 max-w-7xl items-center gap-8 px-6">
+          {/* Wordmark */}
           <Link
             href="/shop"
-            className="font-heading text-[22px] italic font-medium leading-none tracking-tight text-ink"
+            className="flex items-center gap-1.5 text-[15px] font-semibold tracking-tight text-ink"
           >
             Pause
-            <span className="text-[1.2em] text-[oklch(0.55_0.10_35)]">.</span>
+            <span className="size-1 rounded-[1px] bg-accent" />
           </Link>
-          <div className="flex items-center gap-2">
-            {state.config?.demoMode && (
-              <span className="hidden items-center gap-1.5 rounded-full border border-sand bg-sand/40 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.16em] text-ink sm:inline-flex">
-                <span className="size-1 rounded-full bg-ink/60" />
-                Demo · 60s holds
-              </span>
-            )}
-            {remaining !== null && (
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-rule bg-card px-3 py-1 text-xs text-ink">
-                <span
-                  className={cn(
-                    "size-1.5 rounded-full",
-                    healthDot === "sage" && "bg-sage",
-                    healthDot === "sand" && "bg-sand",
-                    healthDot === "alert" && "bg-alert"
-                  )}
-                />
-                <span className="font-mono num-tabular">
-                  {formatCurrency(remaining)}
-                </span>
-                <span className="text-ink-subtle">left</span>
-              </span>
-            )}
-          </div>
-        </div>
-        <div className="border-t border-[oklch(0.55_0.10_35)]/15">
-          <nav className="mx-auto flex max-w-6xl gap-6 px-6">
+
+          {/* Nav */}
+          <nav className="flex items-center gap-6">
             {NAV.map((n) => {
               const active = pathname === n.href;
               return (
@@ -82,36 +58,58 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   key={n.href}
                   href={n.href}
                   className={cn(
-                    "relative inline-flex items-center gap-1.5 py-3 text-[13px] font-medium tracking-[0.04em] transition-colors",
-                    active
-                      ? "text-ink"
-                      : "text-ink-muted hover:text-ink"
+                    "relative text-[13px] font-medium transition-colors",
+                    active ? "text-ink" : "text-ink-3 hover:text-ink"
                   )}
                 >
-                  <span>{n.label}</span>
+                  {n.label}
                   {n.href === "/cart" && cartCount > 0 && (
-                    <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-ink px-1 text-[10px] font-semibold text-paper">
+                    <span className="ml-1 inline-flex h-4 min-w-4 items-center justify-center rounded-sm bg-ink px-1 font-mono text-[10px] font-medium text-paper num-tabular">
                       {cartCount}
                     </span>
-                  )}
-                  {active && (
-                    <span className="absolute inset-x-0 bottom-0 h-px bg-[oklch(0.55_0.10_35)]" />
                   )}
                 </Link>
               );
             })}
           </nav>
+
+          {/* Right cluster */}
+          <div className="ml-auto flex items-center gap-3">
+            {state.config?.demoMode && (
+              <span className="hidden items-center rounded border border-ink-4 px-1.5 py-0.5 font-mono text-[10px] font-medium uppercase tracking-[0.06em] text-ink-2 sm:inline-flex">
+                Demo · 60s
+              </span>
+            )}
+            {remaining !== null && (
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-[12px] num-tabular text-ink-2">
+                  <span className="text-ink">
+                    {formatCurrency(remaining)}
+                  </span>
+                  <span className="text-ink-3"> / {formatCurrency(budgetAmount)}</span>
+                </span>
+                <div className="relative h-1 w-16 bg-ink-4">
+                  <div
+                    className={cn(
+                      "absolute inset-y-0 left-0",
+                      spentPct >= 100 ? "bg-negative" : "bg-ink"
+                    )}
+                    style={{ width: `${spentPct}%` }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-10 md:py-14">
+
+      <main className="mx-auto w-full max-w-7xl flex-1 px-6 pt-12 pb-24">
         {children}
       </main>
-      <footer className="border-t border-rule px-6 py-8">
-        <div className="mx-auto flex max-w-6xl items-center justify-between text-xs text-ink-subtle">
-          <span className="font-heading italic">
-            Pause<span className="text-[oklch(0.55_0.10_35)]">.</span>
-          </span>
-          <span>A small reflection at checkout.</span>
+
+      <footer className="border-t border-ink-4 px-6 py-4">
+        <div className="mx-auto max-w-7xl font-mono text-[11px] text-ink-3">
+          Pause · local-only · v0.1
         </div>
       </footer>
     </div>

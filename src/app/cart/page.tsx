@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { Minus, Plus, Trash2, ArrowRight } from "lucide-react";
+import { Minus, Plus, X, ArrowRight } from "lucide-react";
 import { useAppState } from "@/context/AppStateContext";
 import { getCatalogItem, unsplashUrl } from "@/lib/catalog";
 import {
@@ -31,7 +31,7 @@ export default function CartPage() {
   }, [hydrated, state.config, router]);
 
   if (!hydrated || !state.config?.onboardingComplete) {
-    return <p className="py-10 text-sm text-ink-subtle">Loading…</p>;
+    return <p className="py-10 text-sm text-ink-3">Loading…</p>;
   }
 
   const config = state.config;
@@ -49,6 +49,9 @@ export default function CartPage() {
     .filter((l): l is NonNullable<typeof l> => l !== null);
 
   const total = lines.reduce((sum, l) => sum + l.subtotal, 0);
+  const totalQty = lines.reduce((s, l) => s + l.line.qty, 0);
+  const essentialCount = lines.filter((l) => l.essential).length;
+  const reviewCount = lines.length - essentialCount;
 
   const decision = useMemo(
     () => decideIntervention(breakdownCart(state.cart, config), config),
@@ -62,164 +65,148 @@ export default function CartPage() {
     }
     purchaseCart(state.cart, { need: 1 }, true);
     toast.success("Purchase complete", {
-      description: `${formatCurrency(total)} · essentials only, no friction.`,
+      description: `${formatCurrency(total)} · essentials only.`,
     });
     router.replace("/dashboard");
   }
 
   if (lines.length === 0) {
     return (
-      <div className="mx-auto flex max-w-md flex-col items-center justify-center gap-4 py-24 text-center">
-        <div className="text-[10px] font-medium uppercase tracking-[0.22em] text-ink-subtle">
-          Empty cart
-        </div>
-        <h1 className="font-heading text-3xl tracking-tight text-ink">
-          Nothing to reflect on yet.
+      <div className="flex flex-col items-start gap-6 py-12">
+        <h1 className="text-[96px] font-semibold leading-[0.95] tracking-[-0.04em] text-ink">
+          Cart.
         </h1>
-        <p className="text-sm text-ink-muted">
-          Browse the shop and add something. Your essentials will pass through;
-          everything else gets a small pause.
-        </p>
+        <p className="text-base text-ink-2">Cart is empty.</p>
         <Link
           href="/shop"
-          className={cn(buttonVariants(), "mt-2")}
+          className={cn(
+            buttonVariants({ variant: "outline" }),
+            "border-ink-4 text-ink hover:bg-surface-2"
+          )}
         >
           Go to shop
+          <ArrowRight className="size-3.5" />
         </Link>
       </div>
     );
   }
 
   return (
-    <div className="space-y-10">
-      <header className="max-w-2xl space-y-2">
-        <div className="text-[11px] font-medium uppercase tracking-[0.22em] text-ink-subtle">
-          The cart
-        </div>
-        <h1 className="font-heading text-4xl leading-tight tracking-tight text-ink md:text-5xl">
-          Before you check out.
+    <div className="space-y-12">
+      {/* Hero */}
+      <header className="space-y-3">
+        <h1 className="text-[96px] font-semibold leading-[0.95] tracking-[-0.04em] text-ink">
+          Cart.
         </h1>
-        <p className="font-heading text-lg italic text-ink-muted">
-          Essentials skip the reflection. Everything else gets a quiet pause.
+        <p className="font-mono text-[12px] text-ink-3">
+          {totalQty} {totalQty === 1 ? "item" : "items"} ·{" "}
+          {essentialCount} essential{essentialCount === 1 ? "" : "s"}
+          {reviewCount > 0 ? `, ${reviewCount} for review` : ""}
         </p>
       </header>
 
-      <div className="grid gap-8 lg:grid-cols-[1fr_320px] lg:items-start">
-        <div className="divide-y divide-rule rounded-2xl border border-rule bg-card">
-          {lines.map(({ line, item, essential, subtotal }) => (
-            <div
-              key={item.id}
-              className="flex items-center gap-4 px-4 py-4 sm:gap-5 sm:px-5"
-            >
-              <div className="relative size-14 shrink-0 overflow-hidden rounded-lg bg-paper-deep sm:size-16">
-                <Image
-                  src={unsplashUrl(item.imageId, 128)}
-                  alt={item.name}
-                  fill
-                  sizes="64px"
-                  className="object-cover"
-                />
-              </div>
-              <div className="flex-1 min-w-0 space-y-1">
-                <div className="flex items-center gap-2">
-                  <h3 className="truncate font-heading text-[15px] leading-tight tracking-tight text-ink">
-                    {item.name}
-                  </h3>
-                  {essential && (
-                    <span className="inline-flex shrink-0 items-center rounded-full border border-sage/40 bg-sage-soft px-2 py-0.5 text-[9px] font-medium uppercase tracking-[0.16em] text-ink">
-                      Essential
-                    </span>
-                  )}
-                </div>
-                <div className="text-[11px] uppercase tracking-[0.18em] text-ink-subtle">
-                  {item.category} · {formatCurrency(item.price)} each
-                </div>
-              </div>
-              <div className="hidden items-center gap-1 sm:flex">
-                <Button
-                  size="icon-sm"
-                  variant="outline"
-                  className="border-rule"
-                  onClick={() => setCartQty(item.id, line.qty - 1)}
-                  aria-label="Decrease quantity"
-                >
-                  <Minus className="size-3" />
-                </Button>
-                <span className="w-6 text-center font-mono text-sm num-tabular">
-                  {line.qty}
-                </span>
-                <Button
-                  size="icon-sm"
-                  variant="outline"
-                  className="border-rule"
-                  onClick={() => setCartQty(item.id, line.qty + 1)}
-                  aria-label="Increase quantity"
-                >
-                  <Plus className="size-3" />
-                </Button>
-              </div>
-              <div className="hidden w-20 text-right font-heading text-base num-tabular text-ink sm:block">
-                {formatCurrency(subtotal)}
-              </div>
-              <Button
-                size="icon-sm"
-                variant="ghost"
-                className="text-ink-subtle hover:text-alert"
-                onClick={() => removeFromCart(item.id)}
-                aria-label="Remove from cart"
-              >
-                <Trash2 className="size-4" />
-              </Button>
-            </div>
-          ))}
-        </div>
-
-        <aside className="sticky top-32 space-y-4 rounded-2xl border border-rule bg-paper-deep p-5">
-          <div className="space-y-1">
-            <div className="text-[10px] font-medium uppercase tracking-[0.22em] text-ink-subtle">
-              Order
-            </div>
-            <h2 className="font-heading text-xl tracking-tight text-ink">
-              Summary
-            </h2>
-          </div>
-          <dl className="space-y-2 border-y border-rule py-3 text-sm">
-            <div className="flex items-center justify-between">
-              <dt className="text-ink-muted">Items</dt>
-              <dd className="font-mono num-tabular text-ink">
-                {lines.reduce((s, l) => s + l.line.qty, 0)}
-              </dd>
-            </div>
-            <div className="flex items-center justify-between">
-              <dt className="text-ink-muted">Subtotal</dt>
-              <dd className="font-mono num-tabular text-ink">
-                {formatCurrency(total)}
-              </dd>
-            </div>
-          </dl>
-          <div className="flex items-baseline justify-between">
-            <span className="text-[11px] uppercase tracking-[0.22em] text-ink-subtle">
-              Total
-            </span>
-            <span className="font-heading text-3xl tracking-tight text-ink num-tabular">
-              {formatCurrency(total)}
-            </span>
-          </div>
-          <Button
-            size="lg"
-            className="w-full justify-center bg-ink text-paper hover:bg-ink/90"
-            onClick={handleCheckout}
+      {/* Data table */}
+      <div className="border-t border-ink-4">
+        {lines.map(({ line, item, essential, subtotal }, idx) => (
+          <div
+            key={item.id}
+            className="group flex h-14 items-center gap-4 border-b border-ink-4 px-2 transition-colors hover:bg-surface-2"
           >
-            <span className="size-1.5 rounded-full bg-[oklch(0.55_0.10_35)]" />
-            Check out
-            <ArrowRight className="size-4" />
-          </Button>
-          <p className="text-center text-[11px] italic text-ink-subtle">
-            {decision.triggered
-              ? "A small pause is waiting on the next step."
-              : "Essentials only — no pause needed."}
-          </p>
-        </aside>
+            <span className="hidden w-6 font-mono text-[11px] text-ink-3 num-tabular sm:inline-block">
+              {String(idx + 1).padStart(2, "0")}
+            </span>
+            <div className="relative size-8 shrink-0 overflow-hidden rounded-sm bg-surface-2">
+              <Image
+                src={unsplashUrl(item.imageId, 64)}
+                alt=""
+                fill
+                sizes="32px"
+                className="object-cover"
+              />
+            </div>
+            <div className="flex flex-1 min-w-0 items-center gap-2">
+              <span className="truncate text-[14px] font-medium text-ink">
+                {item.name}
+              </span>
+              {essential ? (
+                <span className="hidden rounded border border-ink-4 px-1 py-px font-mono text-[9px] uppercase tracking-[0.06em] text-ink-2 md:inline-block">
+                  Essential
+                </span>
+              ) : (
+                <span className="hidden text-[12px] text-ink-3 md:inline-block">
+                  · {item.category}
+                </span>
+              )}
+            </div>
+            <div className="hidden items-center gap-1 sm:flex">
+              <button
+                onClick={() => setCartQty(item.id, line.qty - 1)}
+                className="flex size-7 items-center justify-center rounded-sm text-ink-2 hover:bg-ink-4/30 hover:text-ink"
+                aria-label="Decrease"
+              >
+                <Minus className="size-3" />
+              </button>
+              <span className="w-5 text-center font-mono text-[12px] num-tabular">
+                {line.qty}
+              </span>
+              <button
+                onClick={() => setCartQty(item.id, line.qty + 1)}
+                className="flex size-7 items-center justify-center rounded-sm text-ink-2 hover:bg-ink-4/30 hover:text-ink"
+                aria-label="Increase"
+              >
+                <Plus className="size-3" />
+              </button>
+            </div>
+            <span className="hidden w-20 text-right font-mono text-[12px] num-tabular text-ink-2 sm:inline-block">
+              {formatCurrency(item.price)}
+            </span>
+            <span className="w-20 text-right font-mono text-[13px] font-medium num-tabular text-ink">
+              {formatCurrency(subtotal)}
+            </span>
+            <button
+              onClick={() => removeFromCart(item.id)}
+              className="flex size-7 items-center justify-center rounded-sm text-ink-3 opacity-0 hover:bg-ink-4/30 hover:text-negative group-hover:opacity-100"
+              aria-label="Remove"
+            >
+              <X className="size-3.5" />
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {/* Total — the loud moment */}
+      <div className="flex flex-col items-end gap-2 pt-8">
+        <span className="font-mono text-[11px] uppercase tracking-[0.06em] text-ink-3">
+          Total
+        </span>
+        <span className="text-[80px] font-medium leading-none tracking-[-0.04em] text-ink num-tabular">
+          {formatCurrency(total)}
+        </span>
+        {decision.triggered && (
+          <span className="font-mono text-[11px] text-ink-3">
+            {reviewCount} {reviewCount === 1 ? "candidate" : "candidates"} for review
+          </span>
+        )}
+      </div>
+
+      {/* Actions */}
+      <div className="flex justify-end gap-2">
+        <Link
+          href="/shop"
+          className={cn(
+            buttonVariants({ variant: "ghost" }),
+            "text-ink-2 hover:bg-surface-2 hover:text-ink"
+          )}
+        >
+          Continue shopping
+        </Link>
+        <Button
+          onClick={handleCheckout}
+          className="bg-ink text-paper hover:bg-ink/90"
+        >
+          Check out
+          <ArrowRight className="size-3.5" />
+        </Button>
       </div>
 
       <InterventionModal open={modalOpen} onOpenChange={setModalOpen} />
