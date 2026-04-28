@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ShoppingBag, Clock, Sparkles, Info } from "lucide-react";
+import Image from "next/image";
+import { ShoppingBag, Clock, ArrowRight } from "lucide-react";
 import { useAppState } from "@/context/AppStateContext";
 import {
   CartBreakdown,
@@ -13,21 +14,15 @@ import {
 import { remainingBudget, periodLabel } from "@/lib/budget";
 import { formatCurrency } from "@/lib/format";
 import { Necessity } from "@/lib/types";
+import { unsplashUrl } from "@/lib/catalog";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { LightPause } from "./LightPause";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -36,6 +31,12 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
+
+const NECESSITY_OPTIONS: { value: Necessity; label: string; hint: string }[] = [
+  { value: "need", label: "Need", hint: "Essential to me" },
+  { value: "want", label: "Want", hint: "Nice to have" },
+  { value: "unsure", label: "Unsure", hint: "Still deciding" },
+];
 
 export function InterventionModal({ open, onOpenChange }: Props) {
   const router = useRouter();
@@ -72,14 +73,13 @@ export function InterventionModal({ open, onOpenChange }: Props) {
 
   if (!open || !config || !breakdown || !decision) return null;
 
-  // Light friction: replace modal with a 5-second pause overlay
+  // Light friction → 5-second pause overlay
   if (decision.level === "light") {
     return (
       <LightPause
         open={open}
         onOpenChange={onOpenChange}
         onComplete={() => {
-          // After the pause, complete the purchase as-is
           purchaseCart(state.cart, { [necessity]: 1 }, false);
           toast.success("Purchase complete", {
             description: `${formatCurrency(breakdown.total)} charged.`,
@@ -92,13 +92,15 @@ export function InterventionModal({ open, onOpenChange }: Props) {
   }
 
   const overBudget = breakdown.nonEssentialsTotal > remaining;
-  const budgetPct = Math.min(
+  const spent = config.budgetAmount - remaining;
+  const projectedSpent = spent + breakdown.nonEssentialsTotal;
+  const spentPct = Math.min(
     100,
-    Math.round(
-      ((config.budgetAmount - remaining + breakdown.nonEssentialsTotal) /
-        Math.max(config.budgetAmount, 1)) *
-        100
-    )
+    Math.round((spent / Math.max(config.budgetAmount, 1)) * 100)
+  );
+  const projectedPct = Math.min(
+    100,
+    Math.round((projectedSpent / Math.max(config.budgetAmount, 1)) * 100)
   );
 
   function handleBuy() {
@@ -115,7 +117,7 @@ export function InterventionModal({ open, onOpenChange }: Props) {
     toast.success("Saved for 24 hours", {
       description: config!.demoMode
         ? "Demo mode: items will resolve in ~60s."
-        : "If you don't buy within 24h, the amount counts toward your savings.",
+        : "If you don't return to buy, the amount counts toward your savings.",
     });
     onOpenChange(false);
     router.replace("/dashboard");
@@ -125,186 +127,251 @@ export function InterventionModal({ open, onOpenChange }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="size-5 text-primary" />
-            A pause to reflect
-          </DialogTitle>
-          <DialogDescription>
-            Take a moment before completing this checkout.
-          </DialogDescription>
-        </DialogHeader>
+      <DialogContent
+        className="max-w-xl overflow-hidden border-rule bg-paper p-0 shadow-[0_24px_60px_-24px_rgba(20,20,30,0.25)]"
+        showCloseButton={false}
+      >
+        <div className="space-y-6 p-7 sm:p-8">
+          <DialogHeader className="space-y-2 text-left">
+            <div className="flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.22em] text-ink-subtle">
+              <span className="size-1 rounded-full bg-[oklch(0.55_0.10_35)]" />
+              {isStrict ? "A firm pause" : "A pause to reflect"}
+            </div>
+            <DialogTitle className="font-heading text-3xl leading-tight tracking-tight text-ink">
+              <span className="italic">A small moment</span> before you buy.
+            </DialogTitle>
+            <DialogDescription className="font-heading text-base italic text-ink-muted">
+              Take a breath. Nothing is locked.
+            </DialogDescription>
+          </DialogHeader>
 
-        <div className="space-y-4">
-          <Card>
-            <CardContent className="space-y-3 py-4">
-              <div className="flex items-start gap-2 text-sm">
-                <Info className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                <div className="flex-1 text-muted-foreground">
-                  <span className="font-medium text-foreground">
-                    Why this prompt?
+          {/* Trigger-rule pull-quote */}
+          <blockquote className="border-l-2 border-[oklch(0.55_0.10_35)] py-1 pl-4">
+            <p className="text-[13px] leading-relaxed text-ink">
+              <span className="text-ink-muted">Why this prompt — </span>
+              {decision.reason}.{" "}
+              {overBudget ? (
+                <>
+                  This would put you{" "}
+                  <span className="text-alert">over your budget</span> for{" "}
+                  {periodLabel(config.budgetPeriod)}.
+                </>
+              ) : (
+                <>
+                  You have{" "}
+                  <span className="font-mono num-tabular text-ink">
+                    {formatCurrency(remaining)}
                   </span>{" "}
-                  {decision.reason}.{" "}
-                  {overBudget
-                    ? `This would put you over your ${periodLabel(
-                        config.budgetPeriod
-                      )} budget.`
-                    : `You have ${formatCurrency(remaining)} left ${periodLabel(
-                        config.budgetPeriod
-                      )}.`}
-                </div>
-              </div>
-
-              <Separator />
-
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">
-                    Non-essentials in cart
-                  </span>
-                  <span className="font-mono font-medium">
-                    {formatCurrency(breakdown.nonEssentialsTotal)}
-                  </span>
-                </div>
-                {breakdown.essentialsTotal > 0 && (
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Essentials</span>
-                    <span className="font-mono">
-                      {formatCurrency(breakdown.essentialsTotal)}
-                    </span>
-                  </div>
-                )}
-                <Separator className="my-1" />
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">
-                    {periodLabel(config.budgetPeriod)} progress
-                  </span>
-                  <span className="font-mono text-sm">
-                    {formatCurrency(config.budgetAmount - remaining)} /{" "}
-                    {formatCurrency(config.budgetAmount)}
-                  </span>
-                </div>
-                <Progress
-                  value={budgetPct}
-                  className={cn(overBudget && "[&>*]:bg-destructive")}
-                />
-                {overBudget && (
-                  <p className="text-xs text-destructive">
-                    This purchase exceeds your remaining budget by{" "}
-                    {formatCurrency(breakdown.nonEssentialsTotal - remaining)}.
-                  </p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {breakdown.essentials.length > 0 && (
-            <p className="text-xs text-muted-foreground">
-              Your {breakdown.essentials.length} essential item
-              {breakdown.essentials.length === 1 ? "" : "s"} will be purchased
-              regardless of which option you choose.
+                  left {periodLabel(config.budgetPeriod)}.
+                </>
+              )}
             </p>
-          )}
+          </blockquote>
 
+          {/* Budget bar */}
           <div className="space-y-2">
-            <Label className="text-sm">Why do you want this?</Label>
-            <RadioGroup
-              value={necessity}
-              onValueChange={(v) => setNecessity(v as Necessity)}
-              className="grid grid-cols-3 gap-2"
-            >
-              {(["need", "want", "unsure"] as Necessity[]).map((n) => (
-                <label
-                  key={n}
+            <div className="flex items-baseline justify-between">
+              <span className="text-[10px] font-medium uppercase tracking-[0.22em] text-ink-subtle">
+                {periodLabel(config.budgetPeriod)}
+              </span>
+              <span className="font-mono text-xs num-tabular text-ink-muted">
+                {formatCurrency(spent)}{" "}
+                <span className="text-ink-subtle/60">→</span>{" "}
+                <span
                   className={cn(
-                    "flex cursor-pointer items-center justify-center gap-2 rounded-md border border-border px-3 py-2 text-sm capitalize transition-colors",
-                    necessity === n
-                      ? "border-primary bg-primary/5"
-                      : "hover:bg-muted/50"
+                    overBudget ? "text-alert" : "text-ink"
                   )}
                 >
-                  <RadioGroupItem value={n} id={`necessity-${n}`} />
-                  <span>{n}</span>
-                </label>
-              ))}
-            </RadioGroup>
+                  {formatCurrency(projectedSpent)}
+                </span>
+                <span className="text-ink-subtle/60">
+                  {" "}
+                  / {formatCurrency(config.budgetAmount)}
+                </span>
+              </span>
+            </div>
+            <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-paper-deep">
+              <div
+                className="absolute inset-y-0 left-0 bg-ink/60"
+                style={{ width: `${spentPct}%` }}
+              />
+              <div
+                className={cn(
+                  "absolute inset-y-0",
+                  overBudget
+                    ? "bg-alert/40"
+                    : "bg-[oklch(0.55_0.10_35)]/50"
+                )}
+                style={{
+                  left: `${spentPct}%`,
+                  width: `${projectedPct - spentPct}%`,
+                }}
+              />
+              <div
+                className={cn(
+                  "absolute -top-0.5 h-2.5 w-px",
+                  overBudget ? "bg-alert" : "bg-[oklch(0.55_0.10_35)]"
+                )}
+                style={{ left: `${projectedPct}%` }}
+              />
+            </div>
           </div>
 
-          {showAlternatives && alternatives.length > 0 && (
+          {/* Necessity segmented control */}
+          <div className="space-y-2">
+            <div className="text-[10px] font-medium uppercase tracking-[0.22em] text-ink-subtle">
+              Why do you want this?
+            </div>
+            <div
+              role="radiogroup"
+              className="grid grid-cols-3 overflow-hidden rounded-lg border border-rule"
+            >
+              {NECESSITY_OPTIONS.map((opt) => {
+                const active = necessity === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    role="radio"
+                    aria-checked={active}
+                    onClick={() => setNecessity(opt.value)}
+                    className={cn(
+                      "group flex flex-col items-start gap-0.5 border-r border-rule px-4 py-3 text-left transition-colors last:border-r-0",
+                      active
+                        ? "bg-ink text-paper"
+                        : "bg-card text-ink hover:bg-paper-deep"
+                    )}
+                  >
+                    <span className="font-heading text-base tracking-tight">
+                      {opt.label}
+                    </span>
+                    <span
+                      className={cn(
+                        "text-[11px]",
+                        active ? "text-paper/70" : "text-ink-subtle"
+                      )}
+                    >
+                      {opt.hint}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Alternatives */}
+          {showAlternatives && (
             <div className="space-y-2">
-              <Label className="text-sm">In-budget alternatives</Label>
-              <div className="space-y-2">
-                {alternatives.map((alt) => {
-                  const inCart = state.cart.find((l) => l.itemId === alt.id);
-                  return (
-                    <Card key={alt.id}>
-                      <CardContent className="flex items-center gap-3 py-3">
-                        <div className="text-2xl">{alt.emoji}</div>
-                        <div className="flex-1">
-                          <div className="text-sm font-medium">{alt.name}</div>
-                          <div className="text-xs text-muted-foreground">
+              <div className="text-[10px] font-medium uppercase tracking-[0.22em] text-ink-subtle">
+                In-budget alternatives
+              </div>
+              {alternatives.length === 0 ? (
+                <p className="text-sm italic text-ink-muted">
+                  No in-budget alternatives in this category. Save for 24 hours
+                  is a quieter option.
+                </p>
+              ) : (
+                <div className="divide-y divide-rule rounded-lg border border-rule bg-card">
+                  {alternatives.map((alt) => {
+                    const inCart = state.cart.find(
+                      (l) => l.itemId === alt.id
+                    );
+                    return (
+                      <div
+                        key={alt.id}
+                        className="flex items-center gap-3 px-4 py-3"
+                      >
+                        <div className="relative size-12 shrink-0 overflow-hidden rounded-md bg-paper-deep">
+                          <Image
+                            src={unsplashUrl(alt.imageId, 96)}
+                            alt={alt.name}
+                            fill
+                            sizes="48px"
+                            className="object-cover"
+                          />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="truncate font-heading text-sm tracking-tight text-ink">
+                            {alt.name}
+                          </div>
+                          <div className="font-mono text-[11px] num-tabular text-ink-subtle">
                             {formatCurrency(alt.price)}
                           </div>
                         </div>
                         <Button
                           size="sm"
                           variant={inCart ? "secondary" : "outline"}
+                          className={cn(
+                            "border-ink/15 text-ink hover:bg-ink hover:text-paper",
+                            inCart &&
+                              "border-sage/30 bg-sage-soft text-ink hover:bg-sage-soft hover:text-ink"
+                          )}
                           onClick={() =>
-                            inCart
-                              ? removeFromCart(alt.id)
-                              : addToCart(alt.id)
+                            inCart ? removeFromCart(alt.id) : addToCart(alt.id)
                           }
                         >
                           {inCart ? "Remove" : "Swap in"}
                         </Button>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-          )}
-
-          {showAlternatives && alternatives.length === 0 && (
-            <p className="text-xs text-muted-foreground">
-              No in-budget alternatives in this category. Try Save for 24h.
-            </p>
           )}
         </div>
 
-        <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-end">
-          {!showAlternatives && (
-            <Button
-              variant="outline"
-              onClick={() => setShowAlternatives(true)}
-              className="sm:mr-auto"
-            >
-              Show alternatives
-            </Button>
-          )}
-          <Button
-            variant={isStrict ? "outline" : "outline"}
-            onClick={handleBuy}
-          >
-            <ShoppingBag className="size-4" />
-            Buy now
-          </Button>
-          <Button
-            variant={isStrict ? "default" : "default"}
-            onClick={handleSave}
-          >
-            <Clock className="size-4" />
-            Save for 24h
-          </Button>
-        </DialogFooter>
+        {/* Action footer with subtle separator */}
+        <div className="border-t border-rule bg-paper-deep/40 p-5 sm:p-6">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            {!showAlternatives ? (
+              <button
+                type="button"
+                onClick={() => setShowAlternatives(true)}
+                className="text-left text-[12px] uppercase tracking-[0.18em] text-ink-muted underline-offset-4 hover:text-ink hover:underline"
+              >
+                See cheaper alternatives →
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowAlternatives(false)}
+                className="text-left text-[12px] uppercase tracking-[0.18em] text-ink-muted underline-offset-4 hover:text-ink hover:underline"
+              >
+                ← Back
+              </button>
+            )}
 
-        {isStrict && (
-          <p className="text-xs text-muted-foreground">
-            Strict mode: Save-for-24h is the recommended action. Buy now is
-            still available.
-          </p>
-        )}
+            <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center">
+              <Button
+                variant={isStrict ? "outline" : "ghost"}
+                onClick={handleBuy}
+                className={cn(
+                  "justify-center",
+                  isStrict
+                    ? "border-rule text-ink-muted hover:bg-paper-deep hover:text-ink"
+                    : "text-ink hover:bg-paper-deep"
+                )}
+              >
+                <ShoppingBag className="size-4" />
+                Buy now · {formatCurrency(breakdown.total)}
+              </Button>
+              <Button
+                onClick={handleSave}
+                className="justify-center bg-ink text-paper hover:bg-ink/90"
+              >
+                <Clock className="size-4" />
+                Save for 24 hours
+                <ArrowRight className="size-4" />
+              </Button>
+            </div>
+          </div>
+          {isStrict && (
+            <p className="mt-3 text-right font-heading text-[12px] italic text-ink-muted">
+              Strict mode — saving is the recommended path.
+            </p>
+          )}
+        </div>
       </DialogContent>
     </Dialog>
   );
