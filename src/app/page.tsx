@@ -29,7 +29,7 @@ function Gate() {
 export default function HomePage() {
   return (
     <div className="flex min-h-[40vh] items-center justify-center">
-      <p className="text-sm text-muted-foreground">Loading…</p>
+      <p className="text-sm text-ink-subtle">Loading…</p>
       <Suspense>
         <Gate />
       </Suspense>
