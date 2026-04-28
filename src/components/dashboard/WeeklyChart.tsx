@@ -1,14 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
-import {
-  Bar,
-  BarChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+import { useMemo, useState } from "react";
 import { SavingsLedger } from "@/lib/types";
 import { dayKey, formatCurrency } from "@/lib/format";
 
@@ -20,31 +12,6 @@ interface Datum {
   amount: number;
 }
 
-interface TooltipPayloadEntry {
-  value?: number;
-}
-
-function CustomTooltip({
-  active,
-  payload,
-  label,
-}: {
-  active?: boolean;
-  payload?: TooltipPayloadEntry[];
-  label?: string;
-}) {
-  if (!active || !payload || payload.length === 0) return null;
-  const value = Number(payload[0]?.value ?? 0);
-  return (
-    <div className="rounded-md border border-rule bg-card px-3 py-2 shadow-[0_8px_24px_-12px_rgba(20,20,30,0.12)]">
-      <div className="font-heading text-xs italic text-ink-muted">{label}</div>
-      <div className="font-mono text-sm num-tabular text-ink">
-        {formatCurrency(value)}
-      </div>
-    </div>
-  );
-}
-
 export function WeeklyChart({ savings }: { savings: SavingsLedger }) {
   const data = useMemo<Datum[]>(() => {
     const out: Datum[] = [];
@@ -54,68 +21,71 @@ export function WeeklyChart({ savings }: { savings: SavingsLedger }) {
       const ts = now - i * oneDay;
       const k = dayKey(ts);
       const d = new Date(ts);
-      const label = d.toLocaleDateString("en-US", { weekday: "short" });
+      const label = d
+        .toLocaleDateString("en-US", { weekday: "short" })
+        .toUpperCase();
       out.push({ label, date: k, amount: savings.byDay[k] ?? 0 });
     }
     return out;
   }, [savings.byDay]);
 
-  const hasData = data.some((d) => d.amount > 0);
+  const max = Math.max(...data.map((d) => d.amount), 1);
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null);
 
   return (
-    <section className="rounded-2xl border border-rule bg-card p-6">
-      <div className="space-y-1">
-        <div className="text-[10px] font-medium uppercase tracking-[0.22em] text-ink-subtle">
-          The last seven days
-        </div>
-        <h3 className="font-heading text-xl tracking-tight text-ink">
-          What you didn&apos;t spend.
-        </h3>
+    <section className="space-y-3">
+      <div className="flex items-baseline justify-between border-b border-ink-4 pb-2">
+        <span className="text-[14px] font-medium text-ink">Last 7 days</span>
+        <span className="font-mono text-[11px] text-ink-3">
+          {hoverIdx !== null ? data[hoverIdx].date : ""}
+        </span>
       </div>
 
-      <div className="mt-6">
-        {hasData ? (
-          <div className="h-44">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={data}
-                margin={{ top: 8, right: 4, bottom: 0, left: 0 }}
-                barCategoryGap="22%"
-              >
-                <XAxis
-                  dataKey="label"
-                  fontSize={11}
-                  tickLine={false}
-                  axisLine={{ stroke: "var(--rule)" }}
-                  tick={{ fill: "var(--ink-subtle)", fontFamily: "var(--font-mono)" }}
-                />
-                <YAxis
-                  fontSize={11}
-                  tickLine={false}
-                  axisLine={false}
-                  tickFormatter={(v) => `$${v}`}
-                  tick={{ fill: "var(--ink-subtle)", fontFamily: "var(--font-mono)" }}
-                  width={36}
-                />
-                <Tooltip
-                  content={<CustomTooltip />}
-                  cursor={{ fill: "var(--paper-deep)" }}
-                />
-                <Bar
-                  dataKey="amount"
-                  radius={[6, 6, 0, 0]}
-                  fill="var(--accent)"
-                  fillOpacity={0.85}
-                />
-              </BarChart>
-            </ResponsiveContainer>
+      <div className="relative pt-6">
+        {/* Hover value label */}
+        {hoverIdx !== null && data[hoverIdx].amount > 0 && (
+          <div
+            className="absolute top-0 -translate-x-1/2 font-mono text-[12px] num-tabular text-ink"
+            style={{
+              left: `${((hoverIdx + 0.5) / data.length) * 100}%`,
+            }}
+          >
+            {formatCurrency(data[hoverIdx].amount)}
           </div>
-        ) : (
-          <p className="py-6 text-sm italic text-ink-muted">
-            Save an item for later — when it expires without being bought, it
-            shows up here.
-          </p>
         )}
+        <div className="flex h-[160px] items-end gap-1">
+          {data.map((d, i) => {
+            const heightPct = (d.amount / max) * 100;
+            const active = hoverIdx === i;
+            return (
+              <button
+                key={d.date}
+                onMouseEnter={() => setHoverIdx(i)}
+                onMouseLeave={() => setHoverIdx(null)}
+                onFocus={() => setHoverIdx(i)}
+                onBlur={() => setHoverIdx(null)}
+                className="group relative flex flex-1 flex-col items-center gap-2 outline-none"
+                aria-label={`${d.label}: ${formatCurrency(d.amount)}`}
+              >
+                <div className="flex h-[140px] w-full items-end">
+                  <div
+                    className={`w-full transition-colors ${
+                      active ? "bg-accent" : "bg-ink-4 group-hover:bg-ink-3"
+                    }`}
+                    style={{ height: `${Math.max(heightPct, 1)}%` }}
+                  />
+                </div>
+                <span
+                  className={`font-mono text-[10px] tracking-[0.06em] num-tabular ${
+                    active ? "text-ink" : "text-ink-3"
+                  }`}
+                >
+                  {d.label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
       </div>
     </section>
   );

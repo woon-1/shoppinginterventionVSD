@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { formatCurrency } from "@/lib/format";
 import { SavingsLedger, UserConfig } from "@/lib/types";
 
@@ -8,71 +9,72 @@ interface Props {
   config: UserConfig;
 }
 
+function useCountUp(target: number, duration = 600): number {
+  const [value, setValue] = useState(0);
+  const startedRef = useRef(false);
+
+  useEffect(() => {
+    // Animate up from current value to new target
+    const start = value;
+    const delta = target - start;
+    if (delta === 0) return;
+    let raf: number;
+    const t0 = performance.now();
+    const animate = (now: number) => {
+      const elapsed = now - t0;
+      const t = Math.min(1, elapsed / duration);
+      // ease-out cubic
+      const eased = 1 - Math.pow(1 - t, 3);
+      setValue(start + delta * eased);
+      if (t < 1) raf = requestAnimationFrame(animate);
+    };
+    raf = requestAnimationFrame(animate);
+    startedRef.current = true;
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [target, duration]);
+
+  return value;
+}
+
 export function SavingsHero({ savings, config }: Props) {
   const goal = config.savingsGoal;
+  const animated = useCountUp(savings.totalSaved);
   const goalPct = goal
     ? Math.min(100, Math.round((savings.totalSaved / goal.amount) * 100))
     : null;
 
-  // Split currency into dollars and cents for editorial layout
-  const dollars = Math.floor(savings.totalSaved);
-  const cents = Math.round((savings.totalSaved - dollars) * 100);
-  const centsStr = String(cents).padStart(2, "0");
-
   return (
-    <section className="relative overflow-hidden rounded-2xl border border-rule bg-gradient-to-br from-paper-deep via-paper to-accent-soft/50 p-8 md:p-10">
-      <div className="space-y-5">
-        <div className="flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.22em] text-ink-subtle">
-          <span className="size-1 rounded-full bg-[oklch(0.55_0.10_35)]" />
-          Saved by not buying
-        </div>
-
-        <div className="flex items-baseline gap-1 font-heading tracking-tight text-ink num-tabular">
-          <span className="self-start pt-3 text-2xl font-medium text-ink-muted md:pt-4 md:text-3xl">
-            $
-          </span>
-          <span className="text-[64px] leading-none md:text-[88px]">
-            {dollars.toLocaleString()}
-          </span>
-          <span className="self-start pt-3 text-2xl font-medium text-ink-muted md:pt-5 md:text-3xl">
-            .{centsStr}
-          </span>
-        </div>
-
-        <p className="max-w-md text-sm leading-relaxed text-ink-muted">
-          {savings.totalSaved === 0
-            ? "When you save items for 24 hours and don't return to buy them, the amount you didn't spend appears here."
-            : `From ${savings.longestSkipStreak === 0 ? 0 : savings.longestSkipStreak} skip${savings.longestSkipStreak === 1 ? "" : "s"} so far. Quietly accumulating.`}
-        </p>
-
-        {goal && goalPct !== null && (
-          <div className="space-y-2 pt-2">
-            <div className="flex items-center justify-between text-xs">
-              <span className="font-heading italic text-ink">
-                {goal.label}
-              </span>
-              <span className="font-mono num-tabular text-ink-subtle">
-                {formatCurrency(savings.totalSaved)}{" "}
-                <span className="text-ink-subtle/60">/</span>{" "}
-                {formatCurrency(goal.amount)}
-              </span>
-            </div>
-            <div className="relative h-px w-full bg-rule">
-              <div
-                className="absolute inset-y-0 left-0 h-px bg-[oklch(0.55_0.10_35)]"
-                style={{ width: `${goalPct}%` }}
-              />
-              <div
-                className="absolute -top-[3px] size-2 -translate-x-1/2 rounded-full bg-[oklch(0.55_0.10_35)]"
-                style={{ left: `${goalPct}%` }}
-              />
-            </div>
-            <p className="text-[11px] uppercase tracking-[0.2em] text-ink-subtle">
-              {goalPct}% of goal
-            </p>
+    <section className="space-y-6">
+      <div className="space-y-3">
+        <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-ink-3">
+          Saved this week
+        </span>
+        <div className="flex items-end gap-6">
+          <div className="text-[112px] font-extralight leading-[0.9] tracking-[-0.04em] text-ink num-tabular md:text-[144px]">
+            {formatCurrency(animated)}
           </div>
-        )}
+        </div>
       </div>
+
+      {goal && goalPct !== null && (
+        <div className="space-y-1.5 max-w-md">
+          <div className="flex items-baseline justify-between font-mono text-[12px] num-tabular text-ink-3">
+            <span>
+              <span className="text-ink-2">{goal.label}</span>{" "}
+              <span className="text-ink-3">→</span>{" "}
+              <span className="text-ink-2">{formatCurrency(goal.amount)}</span>
+            </span>
+            <span className="text-ink-2">{goalPct}%</span>
+          </div>
+          <div className="relative h-px w-full bg-ink-4">
+            <div
+              className="absolute inset-y-0 left-0 bg-accent"
+              style={{ width: `${goalPct}%` }}
+            />
+          </div>
+        </div>
+      )}
     </section>
   );
 }

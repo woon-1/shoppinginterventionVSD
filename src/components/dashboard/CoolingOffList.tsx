@@ -2,24 +2,22 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import { ShoppingBag, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { X } from "lucide-react";
 import { useAppState } from "@/context/AppStateContext";
 import { getCatalogItem, unsplashUrl } from "@/lib/catalog";
 import { CoolingOffStatus } from "@/lib/types";
 import { formatCurrency, formatRelativeTime } from "@/lib/format";
-import { cn } from "@/lib/utils";
 
 const STATUS_LABEL: Record<Exclude<CoolingOffStatus, "pending">, string> = {
-  "expired-saved": "Saved",
-  purchased: "Bought",
-  cancelled: "Cancelled",
+  "expired-saved": "SAVED",
+  purchased: "BOUGHT",
+  cancelled: "CANCELLED",
 };
 
-const STATUS_DOT: Record<Exclude<CoolingOffStatus, "pending">, string> = {
-  "expired-saved": "bg-sage",
-  purchased: "bg-ink",
-  cancelled: "bg-ink-subtle",
+const STATUS_COLOR: Record<Exclude<CoolingOffStatus, "pending">, string> = {
+  "expired-saved": "text-accent",
+  purchased: "text-ink-3",
+  cancelled: "text-ink-3",
 };
 
 export function CoolingOffList() {
@@ -37,131 +35,111 @@ export function CoolingOffList() {
     .slice(-6)
     .reverse();
 
-  return (
-    <section className="space-y-5">
-      <div className="space-y-1">
-        <div className="text-[10px] font-medium uppercase tracking-[0.22em] text-ink-subtle">
-          The queue
+  if (pending.length === 0 && recent.length === 0) {
+    return (
+      <section>
+        <div className="border-b border-ink-4 pb-2">
+          <span className="text-[14px] font-medium text-ink">Queue</span>
         </div>
-        <h2 className="font-heading text-2xl tracking-tight text-ink">
-          Cooling off.
-        </h2>
-      </div>
-
-      {pending.length === 0 && recent.length === 0 ? (
-        <div className="rounded-2xl border border-rule bg-card p-8 text-center">
-          <p className="text-sm italic text-ink-muted">
-            Nothing pending. Save an item for 24 hours and a countdown will
-            appear here.
+        <div className="py-12 text-center">
+          <p className="font-mono text-[12px] text-ink-3">
+            No items in cooling-off.
           </p>
         </div>
-      ) : (
-        <div className="space-y-6">
-          {pending.length > 0 && (
-            <div className="divide-y divide-rule rounded-2xl border border-rule bg-card">
-              {pending.map((entry) => {
-                const item = getCatalogItem(entry.itemId);
-                if (!item) return null;
-                const remaining = entry.expiresAt - now;
-                return (
-                  <div
-                    key={entry.id}
-                    className="flex items-center gap-4 px-5 py-4"
-                  >
-                    <div className="relative size-14 shrink-0 overflow-hidden rounded-lg bg-paper-deep">
-                      <Image
-                        src={unsplashUrl(item.imageId, 128)}
-                        alt={item.name}
-                        fill
-                        sizes="56px"
-                        className="object-cover"
-                      />
-                    </div>
-                    <div className="flex-1 min-w-0 space-y-1">
-                      <div className="flex items-center gap-2">
-                        <h3 className="truncate font-heading text-[15px] leading-tight tracking-tight text-ink">
-                          {item.name}
-                        </h3>
-                        <span className="inline-flex shrink-0 items-center rounded-full border border-rule bg-paper-deep px-2 py-0.5 text-[9px] font-medium uppercase tracking-[0.16em] text-ink-muted">
-                          {entry.necessityTag}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-3 text-[11px] uppercase tracking-[0.16em] text-ink-subtle">
-                        <span className="font-mono num-tabular text-ink-muted">
-                          {formatCurrency(entry.totalPrice)}
-                        </span>
-                        <span className="text-ink-subtle/40">·</span>
-                        <span>
-                          expires in{" "}
-                          <span className="font-mono num-tabular text-[oklch(0.55_0.10_35)]">
-                            {formatRelativeTime(remaining)}
-                          </span>
-                        </span>
-                      </div>
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="border-ink/15 text-ink hover:bg-ink hover:text-paper"
-                      onClick={() => buyCoolingOffEntry(entry.id)}
-                    >
-                      <ShoppingBag className="size-3.5" />
-                      Buy now
-                    </Button>
-                    <Button
-                      size="icon-sm"
-                      variant="ghost"
-                      className="text-ink-subtle"
-                      onClick={() => cancelCoolingOffEntry(entry.id)}
-                      aria-label="Cancel"
-                    >
-                      <X className="size-4" />
-                    </Button>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+      </section>
+    );
+  }
 
-          {recent.length > 0 && (
-            <div className="space-y-2">
-              <div className="text-[10px] font-medium uppercase tracking-[0.22em] text-ink-subtle">
-                Recent outcomes
+  return (
+    <section className="space-y-12">
+      {pending.length > 0 && (
+        <div>
+          <div className="flex items-baseline justify-between border-b border-ink-4 pb-2">
+            <span className="text-[14px] font-medium text-ink">
+              Cooling off
+            </span>
+            <span className="font-mono text-[11px] text-ink-3 num-tabular">
+              {String(pending.length).padStart(2, "0")}
+            </span>
+          </div>
+          {pending.map((entry, idx) => {
+            const item = getCatalogItem(entry.itemId);
+            if (!item) return null;
+            const remaining = entry.expiresAt - now;
+            return (
+              <div
+                key={entry.id}
+                className="group flex h-12 items-center gap-3 border-b border-ink-4 px-2 transition-colors hover:bg-surface-2"
+              >
+                <span className="hidden w-6 font-mono text-[11px] text-ink-3 num-tabular sm:inline-block">
+                  {String(idx + 1).padStart(2, "0")}
+                </span>
+                <div className="relative size-7 shrink-0 overflow-hidden rounded-sm bg-surface-2">
+                  <Image
+                    src={unsplashUrl(item.imageId, 64)}
+                    alt=""
+                    fill
+                    sizes="28px"
+                    className="object-cover"
+                  />
+                </div>
+                <span className="flex-1 truncate text-[13px] text-ink">
+                  {item.name}
+                </span>
+                <span className="hidden font-mono text-[10px] uppercase tracking-[0.06em] text-ink-3 md:inline-block">
+                  {entry.necessityTag}
+                </span>
+                <span className="hidden w-20 text-right font-mono text-[12px] num-tabular text-ink-2 md:inline-block">
+                  {formatCurrency(entry.totalPrice)}
+                </span>
+                <span className="w-16 text-right font-mono text-[12px] num-tabular text-accent">
+                  {formatRelativeTime(remaining)}
+                </span>
+                <button
+                  onClick={() => buyCoolingOffEntry(entry.id)}
+                  className="ml-2 hidden h-7 items-center rounded border border-ink-4 px-2 font-mono text-[11px] text-ink-2 hover:border-ink hover:bg-ink hover:text-paper sm:inline-flex"
+                >
+                  Buy now
+                </button>
+                <button
+                  onClick={() => cancelCoolingOffEntry(entry.id)}
+                  className="flex size-7 items-center justify-center rounded-sm text-ink-3 opacity-0 hover:bg-ink-4/30 hover:text-ink group-hover:opacity-100"
+                  aria-label="Cancel"
+                >
+                  <X className="size-3.5" />
+                </button>
               </div>
-              <div className="rounded-2xl border border-rule bg-card">
-                {recent.map((entry) => {
-                  const item = getCatalogItem(entry.itemId);
-                  if (!item || entry.status === "pending") return null;
-                  const status = entry.status as Exclude<
-                    CoolingOffStatus,
-                    "pending"
-                  >;
-                  return (
-                    <div
-                      key={entry.id}
-                      className="flex items-center gap-3 border-b border-rule px-5 py-3 last:border-b-0"
-                    >
-                      <span
-                        className={cn(
-                          "size-1.5 shrink-0 rounded-full",
-                          STATUS_DOT[status]
-                        )}
-                      />
-                      <span className="flex-1 truncate text-sm text-ink">
-                        {item.name}
-                      </span>
-                      <span className="font-mono text-[11px] num-tabular text-ink-subtle">
-                        {formatCurrency(entry.totalPrice)}
-                      </span>
-                      <span className="text-[10px] uppercase tracking-[0.18em] text-ink-muted">
-                        {STATUS_LABEL[status]}
-                      </span>
-                    </div>
-                  );
-                })}
+            );
+          })}
+        </div>
+      )}
+
+      {recent.length > 0 && (
+        <div>
+          <div className="border-b border-ink-4 pb-2">
+            <span className="text-[14px] font-medium text-ink">Recent</span>
+          </div>
+          {recent.map((entry) => {
+            const item = getCatalogItem(entry.itemId);
+            if (!item || entry.status === "pending") return null;
+            const status = entry.status as Exclude<CoolingOffStatus, "pending">;
+            return (
+              <div
+                key={entry.id}
+                className="flex h-10 items-center gap-3 border-b border-ink-4 px-2 text-[13px]"
+              >
+                <span className="flex-1 truncate text-ink-2">{item.name}</span>
+                <span className="font-mono text-[11px] num-tabular text-ink-3">
+                  {formatCurrency(entry.totalPrice)}
+                </span>
+                <span
+                  className={`w-20 text-right font-mono text-[10px] uppercase tracking-[0.08em] ${STATUS_COLOR[status]}`}
+                >
+                  {STATUS_LABEL[status]}
+                </span>
               </div>
-            </div>
-          )}
+            );
+          })}
         </div>
       )}
     </section>
