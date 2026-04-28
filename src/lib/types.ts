@@ -30,6 +30,7 @@ export interface CatalogItem {
   price: number;
   category: ItemCategory;
   defaultEssential: boolean;
+  imageId: string;
   emoji: string;
 }
 
