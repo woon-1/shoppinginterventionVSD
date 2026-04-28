@@ -1,36 +1,60 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Pause — Online Shopping Intervention Prototype
 
-## Getting Started
+Final-project deliverable for **COMPSCI 2760: Design, Technology, and Social Impact** (Harvard, Spring 2026). Authors: Aaron Contreras, Hannah Park, James Lee. Faculty sponsor: Dr. Krzysztof Gajos.
 
-First, run the development server:
+A working prototype that applies **Value Sensitive Design** to online-shopping addiction. The product introduces deterministic, user-controlled friction at the point of purchase. There is no LLM, no behavior tracking, and no backend — every value the system uses comes from the user explicitly during onboarding.
+
+## Live demo
+
+Deployed via Vercel at the team's project URL.
+
+## What the prototype does
+
+Three surfaces, each tied to a feature derived from the team's Milestone 2 survey signals:
+
+1. **Setup ("Setting Intentions")** — a four-step onboarding wizard captures budget, essential categories, friction intensity, and an optional savings goal.
+2. **Checkout layer** — when a non-essentials cart is checked out, a reflection modal appears. It shows the trigger rule plainly, the cart against remaining budget, a one-tap necessity prompt, and three actions: *Buy now*, *Save for 24 hours*, or *Show alternatives*. Friction intensity (Light / Standard / Strict) parameterizes this single surface.
+3. **Savings dashboard** — total saved by not buying, current skip streak, a 7-day chart, and a live cooling-off queue with countdowns.
+
+## Cross-cutting design properties
+
+- **No hard blocks.** Every prompt has a visible *Buy now* path.
+- **Trigger rules are always visible.** Every interruption explains itself in the user's own units (e.g. "$45 cart, $30 left this week").
+- **Local-only data.** Everything lives in `localStorage` under the key `shoppingintervention.v1`. The settings panel shows the raw stored data and offers a one-click delete.
+
+## Run locally
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000). On a fresh browser you will land on the onboarding wizard.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## User-testing notes
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- **Demo mode** is on by default. While demo mode is on, the cooling-off period is shortened to ~60 seconds so a tester can see the savings flow within a single session. A "DEMO MODE" badge appears in the header.
+- **Reset between sessions** by appending `?reset=1` to the home URL. This wipes `localStorage` and routes back to onboarding.
+- **Fast-forward** any pending cooling-off items from `Settings → Demo mode → Fast-forward pending cooling-off`.
 
-## Learn More
+## Tech stack
 
-To learn more about Next.js, take a look at the following resources:
+Next.js 16 (App Router) · React 19 · TypeScript · Tailwind v4 · shadcn/ui · recharts. State is held in a single React context backed by `localStorage`. No server, no auth, no API routes.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Project structure
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```
+src/
+  app/                # Next App Router pages (/, /setup, /shop, /cart, /dashboard, /settings)
+  components/
+    AppShell.tsx      # Persistent nav with budget pill and demo badge
+    Providers.tsx     # AppStateProvider + Toaster + cooling-off ticker
+    setup/            # SetupWizard and its 4 steps
+    shop/             # ProductCard
+    intervention/     # InterventionModal + LightPause
+    dashboard/        # SavingsHero, SkipStreakCard, WeeklyChart, CoolingOffList
+    ui/               # shadcn primitives
+  context/            # AppStateContext (the entire state tree)
+  hooks/              # useCoolingOffTicker
+  lib/                # types, catalog, intervention rules, budget math, format helpers
+```
