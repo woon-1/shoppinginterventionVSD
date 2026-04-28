@@ -1,21 +1,25 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Minus, Plus, Trash2 } from "lucide-react";
+import { Minus, Plus, Trash2, ShoppingBag } from "lucide-react";
 import { useAppState } from "@/context/AppStateContext";
 import { getCatalogItem } from "@/lib/catalog";
-import { isItemEssential } from "@/lib/intervention";
+import { breakdownCart, decideIntervention, isItemEssential } from "@/lib/intervention";
 import { formatCurrency } from "@/lib/format";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { InterventionModal } from "@/components/intervention/InterventionModal";
+import { toast } from "sonner";
 
 export default function CartPage() {
   const router = useRouter();
-  const { state, hydrated, setCartQty, removeFromCart } = useAppState();
+  const { state, hydrated, setCartQty, removeFromCart, purchaseCart } =
+    useAppState();
+  const [modalOpen, setModalOpen] = useState(false);
 
   useEffect(() => {
     if (hydrated && !state.config?.onboardingComplete) {
@@ -42,6 +46,24 @@ export default function CartPage() {
     .filter((l): l is NonNullable<typeof l> => l !== null);
 
   const total = lines.reduce((sum, l) => sum + l.subtotal, 0);
+
+  const decision = useMemo(
+    () => decideIntervention(breakdownCart(state.cart, config), config),
+    [state.cart, config]
+  );
+
+  function handleCheckout() {
+    if (decision.triggered) {
+      setModalOpen(true);
+      return;
+    }
+    // Essentials-only: bypass friction, complete purchase
+    purchaseCart(state.cart, { need: 1 }, true);
+    toast.success("Purchase complete", {
+      description: `${formatCurrency(total)} charged. Essentials-only — no friction.`,
+    });
+    router.replace("/dashboard");
+  }
 
   if (lines.length === 0) {
     return (
@@ -137,10 +159,13 @@ export default function CartPage() {
       </Card>
 
       <div className="flex justify-end">
-        <Button size="lg" disabled>
-          Checkout (intervention coming next)
+        <Button size="lg" onClick={handleCheckout}>
+          <ShoppingBag className="size-4" />
+          Check out · {formatCurrency(total)}
         </Button>
       </div>
+
+      <InterventionModal open={modalOpen} onOpenChange={setModalOpen} />
     </div>
   );
 }
