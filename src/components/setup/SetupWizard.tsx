@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, Wind, Waves, Mountain } from "lucide-react";
 import {
   ALL_CATEGORIES,
   CATEGORY_LABELS,
@@ -14,7 +13,6 @@ import {
 import { useAppState } from "@/context/AppStateContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 
@@ -31,22 +29,19 @@ interface DraftConfig {
 
 const FRICTION_META: Record<
   FrictionLevel,
-  { name: string; desc: string; icon: typeof Wind }
+  { name: string; desc: string }
 > = {
   light: {
     name: "Light",
-    desc: "A five-second pause before checkout. The shortest reflection.",
-    icon: Wind,
+    desc: "Five-second pause before checkout.",
   },
   standard: {
     name: "Standard",
-    desc: "A reflection prompt with budget context, necessity tag, and three actions.",
-    icon: Waves,
+    desc: "Reflection prompt with budget context and three actions.",
   },
   strict: {
     name: "Strict",
-    desc: "Same prompt as Standard, but Save-for-24h is the recommended path.",
-    icon: Mountain,
+    desc: "Same prompt; Save-for-24h is the recommended path.",
   },
 };
 
@@ -112,35 +107,31 @@ export function SetupWizard() {
   const progressPct = ((step + 1) / STEPS.length) * 100;
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-paper px-6 py-16">
-      <div className="w-full max-w-xl">
-        {/* Brand line */}
-        <div className="mb-12 text-center">
-          <span className="font-heading text-2xl italic tracking-tight text-ink">
-            Pause<span className="text-[oklch(0.55_0.10_35)]">.</span>
-          </span>
+    <div className="flex min-h-screen items-center justify-center bg-paper px-6 py-24">
+      <div className="w-full max-w-md space-y-12">
+        {/* Brand */}
+        <div className="flex items-center gap-1.5 text-[14px] font-semibold tracking-tight text-ink">
+          Pause<span className="size-1 rounded-[1px] bg-accent" />
         </div>
 
-        {/* Step indicator */}
-        <div className="mb-10 space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-ink-subtle num-tabular">
-              {stepNum} / {totalSteps} — {STEPS[step]}
+        {/* Progress */}
+        <div className="space-y-2">
+          <div className="flex items-baseline justify-between font-mono text-[11px] text-ink-3 num-tabular">
+            <span>
+              {stepNum} — {totalSteps}
             </span>
-            <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-ink-subtle">
-              Setting intentions
-            </span>
+            <span>{STEPS[step]}</span>
           </div>
-          <div className="relative h-px w-full bg-rule">
+          <div className="relative h-px bg-ink-4">
             <div
-              className="absolute inset-y-0 left-0 bg-[oklch(0.55_0.10_35)] transition-[width] duration-300 ease-out"
+              className="absolute inset-y-0 left-0 bg-ink transition-[width] duration-300"
               style={{ width: `${progressPct}%` }}
             />
           </div>
         </div>
 
         {/* Body */}
-        <div className="min-h-[280px]">
+        <div className="min-h-[200px]">
           {step === 0 && <BudgetStep draft={draft} setDraft={setDraft} />}
           {step === 1 && (
             <EssentialsStep draft={draft} toggleCategory={toggleCategory} />
@@ -150,31 +141,28 @@ export function SetupWizard() {
         </div>
 
         {/* Nav */}
-        <div className="mt-12 flex items-center justify-between">
-          <Button
-            variant="ghost"
+        <div className="flex items-center justify-between">
+          <button
             onClick={back}
             disabled={step === 0}
-            className="text-ink-muted disabled:opacity-30 hover:bg-paper-deep"
+            className="font-mono text-[12px] text-ink-3 hover:text-ink disabled:opacity-30"
           >
-            <ArrowLeft className="size-4" />
-            Back
-          </Button>
+            ← Back
+          </button>
           {step < STEPS.length - 1 ? (
             <Button
               onClick={next}
               disabled={!canAdvance}
               className="bg-ink text-paper hover:bg-ink/90"
             >
-              Next
-              <ArrowRight className="size-4" />
+              Continue
             </Button>
           ) : (
             <Button
               onClick={complete}
               className="bg-ink text-paper hover:bg-ink/90"
             >
-              Begin
+              Start
             </Button>
           )}
         </div>
@@ -185,23 +173,23 @@ export function SetupWizard() {
 
 function StepHeading({ title, sub }: { title: string; sub: string }) {
   return (
-    <header className="mb-8 space-y-2">
-      <h1 className="font-heading text-3xl italic leading-tight tracking-tight text-ink md:text-4xl">
+    <header className="mb-8 space-y-1.5">
+      <h1 className="text-[28px] font-medium leading-tight tracking-tight text-ink">
         {title}
       </h1>
-      <p className="text-sm text-ink-muted">{sub}</p>
+      <p className="text-[13px] text-ink-2">{sub}</p>
     </header>
   );
 }
 
-function PaperInput(
+function BareInput(
   props: React.InputHTMLAttributes<HTMLInputElement>
 ) {
   return (
     <Input
       {...props}
       className={cn(
-        "h-11 rounded-none border-0 border-b-2 border-rule bg-transparent px-1 font-heading text-lg tracking-tight text-ink shadow-none focus:border-[oklch(0.55_0.10_35)] focus-visible:ring-0",
+        "h-9 rounded-none border-0 border-b border-ink-4 bg-transparent px-0 text-[16px] font-medium text-ink shadow-none focus:border-accent focus-visible:ring-0",
         props.className
       )}
     />
@@ -218,21 +206,17 @@ function BudgetStep({
   return (
     <div>
       <StepHeading
-        title="What's your discretionary budget?"
+        title="Discretionary budget"
         sub="The amount available for non-essentials. Essentials are never blocked."
       />
       <div className="space-y-6">
         <div className="space-y-2">
-          <Label
-            htmlFor="budget"
-            className="text-[10px] font-medium uppercase tracking-[0.22em] text-ink-subtle"
-          >
+          <label className="font-mono text-[11px] uppercase tracking-[0.06em] text-ink-3">
             Amount
-          </Label>
-          <div className="flex items-center gap-3">
-            <span className="font-heading text-2xl italic text-ink-muted">$</span>
-            <PaperInput
-              id="budget"
+          </label>
+          <div className="flex items-center gap-2">
+            <span className="text-[16px] text-ink-3">$</span>
+            <BareInput
               type="number"
               min={1}
               step={1}
@@ -247,12 +231,11 @@ function BudgetStep({
             />
           </div>
         </div>
-
         <div className="space-y-2">
-          <span className="text-[10px] font-medium uppercase tracking-[0.22em] text-ink-subtle">
+          <label className="font-mono text-[11px] uppercase tracking-[0.06em] text-ink-3">
             Period
-          </span>
-          <div className="grid grid-cols-2 overflow-hidden rounded-lg border border-rule">
+          </label>
+          <div className="flex gap-1.5">
             {(["weekly", "monthly"] as Period[]).map((p) => {
               const active = draft.budgetPeriod === p;
               return (
@@ -261,25 +244,13 @@ function BudgetStep({
                   type="button"
                   onClick={() => setDraft((d) => ({ ...d, budgetPeriod: p }))}
                   className={cn(
-                    "border-r border-rule px-4 py-3 text-left transition-colors last:border-r-0",
+                    "h-8 rounded border px-3 text-[12px] font-medium transition-colors",
                     active
-                      ? "bg-ink text-paper"
-                      : "bg-card text-ink hover:bg-paper-deep"
+                      ? "border-ink bg-ink text-paper"
+                      : "border-ink-4 text-ink-2 hover:border-ink hover:text-ink"
                   )}
                 >
-                  <div className="font-heading text-base tracking-tight">
-                    Per {p === "weekly" ? "week" : "month"}
-                  </div>
-                  <div
-                    className={cn(
-                      "text-[11px]",
-                      active ? "text-paper/70" : "text-ink-subtle"
-                    )}
-                  >
-                    {p === "weekly"
-                      ? "Resets each Monday"
-                      : "Resets on the 1st"}
-                  </div>
+                  Per {p === "weekly" ? "week" : "month"}
                 </button>
               );
             })}
@@ -300,33 +271,20 @@ function EssentialsStep({
   return (
     <div>
       <StepHeading
-        title="Which categories are essentials?"
-        sub="Essentials skip the reflection prompt entirely. You can override individual items later."
+        title="Essential categories"
+        sub="Items in these categories skip the reflection prompt."
       />
-      <div className="space-y-2">
+      <div className="border-t border-ink-4">
         {ALL_CATEGORIES.map((cat) => {
           const checked = draft.essentialCategories.includes(cat);
           return (
             <label
               key={cat}
-              className={cn(
-                "flex cursor-pointer items-center justify-between rounded-lg border px-4 py-3.5 transition-colors",
-                checked
-                  ? "border-sage/40 bg-sage-soft"
-                  : "border-rule bg-card hover:bg-paper-deep"
-              )}
+              className="flex h-12 cursor-pointer items-center justify-between border-b border-ink-4"
             >
-              <div className="flex items-center gap-3">
-                <span
-                  className={cn(
-                    "size-1.5 rounded-full",
-                    checked ? "bg-sage" : "bg-ink-subtle/30"
-                  )}
-                />
-                <span className="font-heading text-base tracking-tight text-ink">
-                  {CATEGORY_LABELS[cat]}
-                </span>
-              </div>
+              <span className="text-[14px] font-medium text-ink">
+                {CATEGORY_LABELS[cat]}
+              </span>
               <Switch
                 checked={checked}
                 onCheckedChange={() => toggleCategory(cat)}
@@ -349,44 +307,34 @@ function FrictionStep({
   return (
     <div>
       <StepHeading
-        title="How much friction do you want?"
-        sub="You can change this anytime. Stricter friction means more pause before non-essentials."
+        title="Friction level"
+        sub="Editable later. More friction means more pause before non-essentials."
       />
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         {(Object.keys(FRICTION_META) as FrictionLevel[]).map((level) => {
           const active = draft.friction === level;
           const meta = FRICTION_META[level];
-          const Icon = meta.icon;
           return (
             <button
               key={level}
               type="button"
-              onClick={() =>
-                setDraft((d) => ({ ...d, friction: level }))
-              }
+              onClick={() => setDraft((d) => ({ ...d, friction: level }))}
               className={cn(
-                "flex w-full items-start gap-4 rounded-lg border px-4 py-4 text-left transition-colors",
+                "flex w-full flex-col gap-1 rounded border px-4 py-3 text-left transition-colors",
                 active
-                  ? "border-[oklch(0.55_0.10_35)] bg-[oklch(0.55_0.10_35)]/5"
-                  : "border-rule bg-card hover:bg-paper-deep"
+                  ? "border-accent bg-accent-fade"
+                  : "border-ink-4 bg-surface hover:border-ink"
               )}
             >
-              <div
+              <span
                 className={cn(
-                  "flex size-10 shrink-0 items-center justify-center rounded-md",
-                  active
-                    ? "bg-[oklch(0.55_0.10_35)] text-paper"
-                    : "bg-paper-deep text-ink-muted"
+                  "text-[14px] font-medium",
+                  active ? "text-accent" : "text-ink"
                 )}
               >
-                <Icon className="size-5" />
-              </div>
-              <div className="space-y-1">
-                <div className="font-heading text-lg tracking-tight text-ink">
-                  {meta.name}
-                </div>
-                <p className="text-sm text-ink-muted">{meta.desc}</p>
-              </div>
+                {meta.name}
+              </span>
+              <span className="text-[12px] text-ink-2">{meta.desc}</span>
             </button>
           );
         })}
@@ -405,20 +353,16 @@ function GoalStep({
   return (
     <div>
       <StepHeading
-        title="What are you saving for?"
-        sub="Optional. Naming a goal makes the dashboard feel more concrete. Leave blank to skip."
+        title="Savings goal"
+        sub="Optional. Naming a goal makes the dashboard more concrete."
       />
       <div className="space-y-6">
         <div className="space-y-2">
-          <Label
-            htmlFor="goal-label"
-            className="text-[10px] font-medium uppercase tracking-[0.22em] text-ink-subtle"
-          >
+          <label className="font-mono text-[11px] uppercase tracking-[0.06em] text-ink-3">
             Goal
-          </Label>
-          <PaperInput
-            id="goal-label"
-            placeholder="e.g. Trip in June"
+          </label>
+          <BareInput
+            placeholder="Trip in June"
             value={draft.savingsGoalLabel}
             onChange={(e) =>
               setDraft((d) => ({ ...d, savingsGoalLabel: e.target.value }))
@@ -426,16 +370,12 @@ function GoalStep({
           />
         </div>
         <div className="space-y-2">
-          <Label
-            htmlFor="goal-amount"
-            className="text-[10px] font-medium uppercase tracking-[0.22em] text-ink-subtle"
-          >
+          <label className="font-mono text-[11px] uppercase tracking-[0.06em] text-ink-3">
             Amount
-          </Label>
-          <div className="flex items-center gap-3">
-            <span className="font-heading text-2xl italic text-ink-muted">$</span>
-            <PaperInput
-              id="goal-amount"
+          </label>
+          <div className="flex items-center gap-2">
+            <span className="text-[16px] text-ink-3">$</span>
+            <BareInput
               type="number"
               min={0}
               placeholder="500"
