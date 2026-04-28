@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, Check } from "lucide-react";
+import { ArrowLeft, ArrowRight, Wind, Waves, Mountain } from "lucide-react";
 import {
   ALL_CATEGORIES,
   CATEGORY_LABELS,
@@ -15,9 +15,7 @@ import { useAppState } from "@/context/AppStateContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { cn } from "@/lib/utils";
 
 const STEPS = ["Budget", "Essentials", "Friction", "Goal"] as const;
@@ -31,18 +29,24 @@ interface DraftConfig {
   savingsGoalAmount: number | null;
 }
 
-const FRICTION_DESCRIPTIONS: Record<FrictionLevel, { name: string; desc: string }> = {
+const FRICTION_META: Record<
+  FrictionLevel,
+  { name: string; desc: string; icon: typeof Wind }
+> = {
   light: {
     name: "Light",
-    desc: "A 5-second pause before checkout. The lightest reflection.",
+    desc: "A five-second pause before checkout. The shortest reflection.",
+    icon: Wind,
   },
   standard: {
     name: "Standard",
     desc: "A reflection prompt with budget context, necessity tag, and three actions.",
+    icon: Waves,
   },
   strict: {
     name: "Strict",
-    desc: "Same prompt as Standard, but Save-for-24h is the default action.",
+    desc: "Same prompt as Standard, but Save-for-24h is the recommended path.",
+    icon: Mountain,
   },
 };
 
@@ -103,76 +107,104 @@ export function SetupWizard() {
   const canAdvance =
     step !== 0 || (draft.budgetAmount > 0 && Number.isFinite(draft.budgetAmount));
 
+  const stepNum = String(step + 1).padStart(2, "0");
+  const totalSteps = String(STEPS.length).padStart(2, "0");
+  const progressPct = ((step + 1) / STEPS.length) * 100;
+
   return (
-    <div className="mx-auto flex min-h-[calc(100vh-2rem)] max-w-xl flex-col gap-6 px-4 py-8">
-      <div className="space-y-2">
-        <div className="text-sm text-muted-foreground">
-          Step {step + 1} of {STEPS.length} · {STEPS[step]}
+    <div className="flex min-h-screen items-center justify-center bg-paper px-6 py-16">
+      <div className="w-full max-w-xl">
+        {/* Brand line */}
+        <div className="mb-12 text-center">
+          <span className="font-heading text-2xl italic tracking-tight text-ink">
+            Pause<span className="text-[oklch(0.55_0.10_35)]">.</span>
+          </span>
         </div>
-        <div className="flex gap-1.5">
-          {STEPS.map((_, i) => (
+
+        {/* Step indicator */}
+        <div className="mb-10 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-ink-subtle num-tabular">
+              {stepNum} / {totalSteps} — {STEPS[step]}
+            </span>
+            <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-ink-subtle">
+              Setting intentions
+            </span>
+          </div>
+          <div className="relative h-px w-full bg-rule">
             <div
-              key={i}
-              className={cn(
-                "h-1 flex-1 rounded-full transition-colors",
-                i <= step ? "bg-primary" : "bg-muted"
-              )}
+              className="absolute inset-y-0 left-0 bg-[oklch(0.55_0.10_35)] transition-[width] duration-300 ease-out"
+              style={{ width: `${progressPct}%` }}
             />
-          ))}
+          </div>
         </div>
-      </div>
 
-      <Card className="flex-1">
-        <CardContent className="space-y-6 py-6">
-          {step === 0 && (
-            <BudgetStep
-              draft={draft}
-              setDraft={setDraft}
-            />
-          )}
+        {/* Body */}
+        <div className="min-h-[280px]">
+          {step === 0 && <BudgetStep draft={draft} setDraft={setDraft} />}
           {step === 1 && (
-            <EssentialsStep
-              draft={draft}
-              toggleCategory={toggleCategory}
-            />
+            <EssentialsStep draft={draft} toggleCategory={toggleCategory} />
           )}
-          {step === 2 && (
-            <FrictionStep
-              draft={draft}
-              setDraft={setDraft}
-            />
-          )}
-          {step === 3 && (
-            <GoalStep
-              draft={draft}
-              setDraft={setDraft}
-            />
-          )}
-        </CardContent>
-      </Card>
+          {step === 2 && <FrictionStep draft={draft} setDraft={setDraft} />}
+          {step === 3 && <GoalStep draft={draft} setDraft={setDraft} />}
+        </div>
 
-      <div className="flex justify-between">
-        <Button
-          variant="outline"
-          onClick={back}
-          disabled={step === 0}
-        >
-          <ArrowLeft className="size-4" />
-          Back
-        </Button>
-        {step < STEPS.length - 1 ? (
-          <Button onClick={next} disabled={!canAdvance}>
-            Next
-            <ArrowRight className="size-4" />
+        {/* Nav */}
+        <div className="mt-12 flex items-center justify-between">
+          <Button
+            variant="ghost"
+            onClick={back}
+            disabled={step === 0}
+            className="text-ink-muted disabled:opacity-30 hover:bg-paper-deep"
+          >
+            <ArrowLeft className="size-4" />
+            Back
           </Button>
-        ) : (
-          <Button onClick={complete}>
-            <Check className="size-4" />
-            Start shopping
-          </Button>
-        )}
+          {step < STEPS.length - 1 ? (
+            <Button
+              onClick={next}
+              disabled={!canAdvance}
+              className="bg-ink text-paper hover:bg-ink/90"
+            >
+              Next
+              <ArrowRight className="size-4" />
+            </Button>
+          ) : (
+            <Button
+              onClick={complete}
+              className="bg-ink text-paper hover:bg-ink/90"
+            >
+              Begin
+            </Button>
+          )}
+        </div>
       </div>
     </div>
+  );
+}
+
+function StepHeading({ title, sub }: { title: string; sub: string }) {
+  return (
+    <header className="mb-8 space-y-2">
+      <h1 className="font-heading text-3xl italic leading-tight tracking-tight text-ink md:text-4xl">
+        {title}
+      </h1>
+      <p className="text-sm text-ink-muted">{sub}</p>
+    </header>
+  );
+}
+
+function PaperInput(
+  props: React.InputHTMLAttributes<HTMLInputElement>
+) {
+  return (
+    <Input
+      {...props}
+      className={cn(
+        "h-11 rounded-none border-0 border-b-2 border-rule bg-transparent px-1 font-heading text-lg tracking-tight text-ink shadow-none focus:border-[oklch(0.55_0.10_35)] focus-visible:ring-0",
+        props.className
+      )}
+    />
   );
 }
 
@@ -184,51 +216,74 @@ function BudgetStep({
   setDraft: React.Dispatch<React.SetStateAction<DraftConfig>>;
 }) {
   return (
-    <div className="space-y-4">
-      <div>
-        <h2 className="text-xl font-semibold">What's your discretionary budget?</h2>
-        <p className="text-sm text-muted-foreground">
-          This is for non-essentials. The system never blocks essentials.
-        </p>
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="budget">Amount</Label>
-        <div className="flex items-center gap-2">
-          <span className="text-muted-foreground">$</span>
-          <Input
-            id="budget"
-            type="number"
-            min={1}
-            step={1}
-            value={draft.budgetAmount}
-            onChange={(e) =>
-              setDraft((d) => ({
-                ...d,
-                budgetAmount: Number(e.target.value) || 0,
-              }))
-            }
-            className="max-w-[10rem]"
-          />
-          <RadioGroup
-            value={draft.budgetPeriod}
-            onValueChange={(v) =>
-              setDraft((d) => ({ ...d, budgetPeriod: v as Period }))
-            }
-            className="ml-2 flex flex-row gap-3"
+    <div>
+      <StepHeading
+        title="What's your discretionary budget?"
+        sub="The amount available for non-essentials. Essentials are never blocked."
+      />
+      <div className="space-y-6">
+        <div className="space-y-2">
+          <Label
+            htmlFor="budget"
+            className="text-[10px] font-medium uppercase tracking-[0.22em] text-ink-subtle"
           >
-            <div className="flex items-center gap-2">
-              <RadioGroupItem value="weekly" id="weekly" />
-              <Label htmlFor="weekly" className="font-normal">
-                per week
-              </Label>
-            </div>
-            <div className="flex items-center gap-2">
-              <RadioGroupItem value="monthly" id="monthly" />
-              <Label htmlFor="monthly" className="font-normal">
-                per month
-              </Label>
-            </div>
-          </RadioGroup>
+            Amount
+          </Label>
+          <div className="flex items-center gap-3">
+            <span className="font-heading text-2xl italic text-ink-muted">$</span>
+            <PaperInput
+              id="budget"
+              type="number"
+              min={1}
+              step={1}
+              value={draft.budgetAmount}
+              onChange={(e) =>
+                setDraft((d) => ({
+                  ...d,
+                  budgetAmount: Number(e.target.value) || 0,
+                }))
+              }
+              className="max-w-[10rem]"
+            />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <span className="text-[10px] font-medium uppercase tracking-[0.22em] text-ink-subtle">
+            Period
+          </span>
+          <div className="grid grid-cols-2 overflow-hidden rounded-lg border border-rule">
+            {(["weekly", "monthly"] as Period[]).map((p) => {
+              const active = draft.budgetPeriod === p;
+              return (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => setDraft((d) => ({ ...d, budgetPeriod: p }))}
+                  className={cn(
+                    "border-r border-rule px-4 py-3 text-left transition-colors last:border-r-0",
+                    active
+                      ? "bg-ink text-paper"
+                      : "bg-card text-ink hover:bg-paper-deep"
+                  )}
+                >
+                  <div className="font-heading text-base tracking-tight">
+                    Per {p === "weekly" ? "week" : "month"}
+                  </div>
+                  <div
+                    className={cn(
+                      "text-[11px]",
+                      active ? "text-paper/70" : "text-ink-subtle"
+                    )}
+                  >
+                    {p === "weekly"
+                      ? "Resets each Monday"
+                      : "Resets on the 1st"}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>
@@ -243,14 +298,11 @@ function EssentialsStep({
   toggleCategory: (c: ItemCategory) => void;
 }) {
   return (
-    <div className="space-y-4">
-      <div>
-        <h2 className="text-xl font-semibold">Which categories are essentials?</h2>
-        <p className="text-sm text-muted-foreground">
-          Essentials skip the reflection step. You can override individual items
-          later from the shop.
-        </p>
-      </div>
+    <div>
+      <StepHeading
+        title="Which categories are essentials?"
+        sub="Essentials skip the reflection prompt entirely. You can override individual items later."
+      />
       <div className="space-y-2">
         {ALL_CATEGORIES.map((cat) => {
           const checked = draft.essentialCategories.includes(cat);
@@ -258,13 +310,23 @@ function EssentialsStep({
             <label
               key={cat}
               className={cn(
-                "flex cursor-pointer items-center justify-between rounded-md border border-border px-4 py-3 transition-colors",
+                "flex cursor-pointer items-center justify-between rounded-lg border px-4 py-3.5 transition-colors",
                 checked
-                  ? "border-emerald-500/40 bg-emerald-50 dark:bg-emerald-900/20"
-                  : "hover:bg-muted/50"
+                  ? "border-sage/40 bg-sage-soft"
+                  : "border-rule bg-card hover:bg-paper-deep"
               )}
             >
-              <span className="font-medium">{CATEGORY_LABELS[cat]}</span>
+              <div className="flex items-center gap-3">
+                <span
+                  className={cn(
+                    "size-1.5 rounded-full",
+                    checked ? "bg-sage" : "bg-ink-subtle/30"
+                  )}
+                />
+                <span className="font-heading text-base tracking-tight text-ink">
+                  {CATEGORY_LABELS[cat]}
+                </span>
+              </div>
               <Switch
                 checked={checked}
                 onCheckedChange={() => toggleCategory(cat)}
@@ -285,43 +347,50 @@ function FrictionStep({
   setDraft: React.Dispatch<React.SetStateAction<DraftConfig>>;
 }) {
   return (
-    <div className="space-y-4">
-      <div>
-        <h2 className="text-xl font-semibold">How much friction do you want?</h2>
-        <p className="text-sm text-muted-foreground">
-          You can change this anytime. Stricter friction means more reflection
-          before non-essential purchases.
-        </p>
-      </div>
-      <RadioGroup
-        value={draft.friction}
-        onValueChange={(v) =>
-          setDraft((d) => ({ ...d, friction: v as FrictionLevel }))
-        }
-        className="space-y-2"
-      >
-        {(Object.keys(FRICTION_DESCRIPTIONS) as FrictionLevel[]).map((level) => {
-          const checked = draft.friction === level;
-          const meta = FRICTION_DESCRIPTIONS[level];
+    <div>
+      <StepHeading
+        title="How much friction do you want?"
+        sub="You can change this anytime. Stricter friction means more pause before non-essentials."
+      />
+      <div className="space-y-2">
+        {(Object.keys(FRICTION_META) as FrictionLevel[]).map((level) => {
+          const active = draft.friction === level;
+          const meta = FRICTION_META[level];
+          const Icon = meta.icon;
           return (
-            <label
+            <button
               key={level}
+              type="button"
+              onClick={() =>
+                setDraft((d) => ({ ...d, friction: level }))
+              }
               className={cn(
-                "flex cursor-pointer items-start gap-3 rounded-md border border-border px-4 py-3 transition-colors",
-                checked ? "border-primary bg-primary/5" : "hover:bg-muted/50"
+                "flex w-full items-start gap-4 rounded-lg border px-4 py-4 text-left transition-colors",
+                active
+                  ? "border-[oklch(0.55_0.10_35)] bg-[oklch(0.55_0.10_35)]/5"
+                  : "border-rule bg-card hover:bg-paper-deep"
               )}
             >
-              <RadioGroupItem value={level} id={level} className="mt-0.5" />
-              <div>
-                <Label htmlFor={level} className="font-medium">
-                  {meta.name}
-                </Label>
-                <p className="text-sm text-muted-foreground">{meta.desc}</p>
+              <div
+                className={cn(
+                  "flex size-10 shrink-0 items-center justify-center rounded-md",
+                  active
+                    ? "bg-[oklch(0.55_0.10_35)] text-paper"
+                    : "bg-paper-deep text-ink-muted"
+                )}
+              >
+                <Icon className="size-5" />
               </div>
-            </label>
+              <div className="space-y-1">
+                <div className="font-heading text-lg tracking-tight text-ink">
+                  {meta.name}
+                </div>
+                <p className="text-sm text-ink-muted">{meta.desc}</p>
+              </div>
+            </button>
           );
         })}
-      </RadioGroup>
+      </div>
     </div>
   );
 }
@@ -334,18 +403,20 @@ function GoalStep({
   setDraft: React.Dispatch<React.SetStateAction<DraftConfig>>;
 }) {
   return (
-    <div className="space-y-4">
-      <div>
-        <h2 className="text-xl font-semibold">Optional savings goal</h2>
-        <p className="text-sm text-muted-foreground">
-          Naming a goal makes the savings dashboard feel more concrete. Leave
-          blank to skip.
-        </p>
-      </div>
-      <div className="space-y-3">
+    <div>
+      <StepHeading
+        title="What are you saving for?"
+        sub="Optional. Naming a goal makes the dashboard feel more concrete. Leave blank to skip."
+      />
+      <div className="space-y-6">
         <div className="space-y-2">
-          <Label htmlFor="goal-label">What are you saving for?</Label>
-          <Input
+          <Label
+            htmlFor="goal-label"
+            className="text-[10px] font-medium uppercase tracking-[0.22em] text-ink-subtle"
+          >
+            Goal
+          </Label>
+          <PaperInput
             id="goal-label"
             placeholder="e.g. Trip in June"
             value={draft.savingsGoalLabel}
@@ -355,14 +426,19 @@ function GoalStep({
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="goal-amount">Goal amount (optional)</Label>
-          <div className="flex items-center gap-2">
-            <span className="text-muted-foreground">$</span>
-            <Input
+          <Label
+            htmlFor="goal-amount"
+            className="text-[10px] font-medium uppercase tracking-[0.22em] text-ink-subtle"
+          >
+            Amount
+          </Label>
+          <div className="flex items-center gap-3">
+            <span className="font-heading text-2xl italic text-ink-muted">$</span>
+            <PaperInput
               id="goal-amount"
               type="number"
               min={0}
-              placeholder="e.g. 500"
+              placeholder="500"
               value={draft.savingsGoalAmount ?? ""}
               onChange={(e) =>
                 setDraft((d) => ({
@@ -372,7 +448,7 @@ function GoalStep({
                     : null,
                 }))
               }
-              className="max-w-[10rem]"
+              className="max-w-[12rem]"
             />
           </div>
         </div>
