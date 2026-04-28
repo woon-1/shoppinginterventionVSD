@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { ShoppingBag, Clock, ArrowRight } from "lucide-react";
 import { useAppState } from "@/context/AppStateContext";
 import {
   CartBreakdown,
@@ -18,8 +17,6 @@ import { unsplashUrl } from "@/lib/catalog";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
-  DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -32,10 +29,10 @@ interface Props {
   onOpenChange: (open: boolean) => void;
 }
 
-const NECESSITY_OPTIONS: { value: Necessity; label: string; hint: string }[] = [
-  { value: "need", label: "Need", hint: "Essential to me" },
-  { value: "want", label: "Want", hint: "Nice to have" },
-  { value: "unsure", label: "Unsure", hint: "Still deciding" },
+const NECESSITY_OPTIONS: { value: Necessity; label: string }[] = [
+  { value: "need", label: "Need" },
+  { value: "want", label: "Want" },
+  { value: "unsure", label: "Unsure" },
 ];
 
 export function InterventionModal({ open, onOpenChange }: Props) {
@@ -73,7 +70,6 @@ export function InterventionModal({ open, onOpenChange }: Props) {
 
   if (!open || !config || !breakdown || !decision) return null;
 
-  // Light friction → 5-second pause overlay
   if (decision.level === "light") {
     return (
       <LightPause
@@ -128,79 +124,54 @@ export function InterventionModal({ open, onOpenChange }: Props) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="max-w-xl overflow-hidden border-rule bg-paper p-0 shadow-[0_24px_60px_-24px_rgba(20,20,30,0.25)]"
+        className="max-w-md gap-0 overflow-hidden rounded-md border border-ink-4 bg-surface p-0 shadow-none"
         showCloseButton={false}
       >
-        <div className="space-y-6 p-7 sm:p-8">
-          <DialogHeader className="space-y-2 text-left">
-            <div className="flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.22em] text-ink-subtle">
-              <span className="size-1 rounded-full bg-[oklch(0.55_0.10_35)]" />
-              {isStrict ? "A firm pause" : "A pause to reflect"}
-            </div>
-            <DialogTitle className="font-heading text-3xl leading-tight tracking-tight text-ink">
-              <span className="italic">A small moment</span> before you buy.
-            </DialogTitle>
-            <DialogDescription className="font-heading text-base italic text-ink-muted">
-              Take a breath. Nothing is locked.
-            </DialogDescription>
-          </DialogHeader>
+        {/* Header strip */}
+        <div className="flex items-center justify-between border-b border-ink-4 px-5 py-3">
+          <DialogTitle className="flex items-center gap-1.5 text-[14px] font-semibold tracking-tight text-ink">
+            Pause<span className="size-1 rounded-[1px] bg-accent" />
+          </DialogTitle>
+          <span className="rounded border border-ink-4 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.06em] text-ink-2">
+            {isStrict ? "Strict" : "Standard"}
+          </span>
+        </div>
 
-          {/* Trigger-rule pull-quote */}
-          <blockquote className="border-l-2 border-[oklch(0.55_0.10_35)] py-1 pl-4">
+        <div className="space-y-5 px-5 py-5">
+          {/* Trigger */}
+          <div className="flex items-start gap-2">
+            <span className="mt-1.5 size-1 shrink-0 rounded-[1px] bg-accent" />
             <p className="text-[13px] leading-relaxed text-ink">
-              <span className="text-ink-muted">Why this prompt — </span>
-              {decision.reason}.{" "}
-              {overBudget ? (
+              {formatCurrency(breakdown.nonEssentialsTotal)} in cart,{" "}
+              <span className="font-mono num-tabular">
+                {formatCurrency(remaining)}
+              </span>{" "}
+              left {periodLabel(config.budgetPeriod)}.
+              {overBudget && (
                 <>
-                  This would put you{" "}
-                  <span className="text-alert">over your budget</span> for{" "}
-                  {periodLabel(config.budgetPeriod)}.
-                </>
-              ) : (
-                <>
-                  You have{" "}
-                  <span className="font-mono num-tabular text-ink">
-                    {formatCurrency(remaining)}
-                  </span>{" "}
-                  left {periodLabel(config.budgetPeriod)}.
+                  {" "}
+                  <span className="text-negative">Over budget.</span>
                 </>
               )}
             </p>
-          </blockquote>
+          </div>
 
-          {/* Budget bar */}
-          <div className="space-y-2">
-            <div className="flex items-baseline justify-between">
-              <span className="text-[10px] font-medium uppercase tracking-[0.22em] text-ink-subtle">
-                {periodLabel(config.budgetPeriod)}
-              </span>
-              <span className="font-mono text-xs num-tabular text-ink-muted">
-                {formatCurrency(spent)}{" "}
-                <span className="text-ink-subtle/60">→</span>{" "}
-                <span
-                  className={cn(
-                    overBudget ? "text-alert" : "text-ink"
-                  )}
-                >
-                  {formatCurrency(projectedSpent)}
-                </span>
-                <span className="text-ink-subtle/60">
-                  {" "}
-                  / {formatCurrency(config.budgetAmount)}
-                </span>
-              </span>
+          {/* Compact budget meter */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between font-mono text-[11px] num-tabular text-ink-3">
+              <span>{formatCurrency(spent)}</span>
+              <span className="text-ink-2">{formatCurrency(projectedSpent)}</span>
+              <span>{formatCurrency(config.budgetAmount)}</span>
             </div>
-            <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-paper-deep">
+            <div className="relative h-1 w-full bg-surface-2">
               <div
-                className="absolute inset-y-0 left-0 bg-ink/60"
+                className="absolute inset-y-0 left-0 bg-ink-3"
                 style={{ width: `${spentPct}%` }}
               />
               <div
                 className={cn(
                   "absolute inset-y-0",
-                  overBudget
-                    ? "bg-alert/40"
-                    : "bg-[oklch(0.55_0.10_35)]/50"
+                  overBudget ? "bg-negative" : "bg-accent"
                 )}
                 style={{
                   left: `${spentPct}%`,
@@ -208,24 +179,18 @@ export function InterventionModal({ open, onOpenChange }: Props) {
                 }}
               />
               <div
-                className={cn(
-                  "absolute -top-0.5 h-2.5 w-px",
-                  overBudget ? "bg-alert" : "bg-[oklch(0.55_0.10_35)]"
-                )}
+                className="absolute -top-0.5 h-2 w-px bg-ink"
                 style={{ left: `${projectedPct}%` }}
               />
             </div>
           </div>
 
-          {/* Necessity segmented control */}
+          {/* Necessity */}
           <div className="space-y-2">
-            <div className="text-[10px] font-medium uppercase tracking-[0.22em] text-ink-subtle">
-              Why do you want this?
-            </div>
-            <div
-              role="radiogroup"
-              className="grid grid-cols-3 overflow-hidden rounded-lg border border-rule"
-            >
+            <span className="font-mono text-[11px] uppercase tracking-[0.06em] text-ink-3">
+              Why?
+            </span>
+            <div role="radiogroup" className="grid grid-cols-3 gap-1.5">
               {NECESSITY_OPTIONS.map((opt) => {
                 const active = necessity === opt.value;
                 return (
@@ -236,23 +201,13 @@ export function InterventionModal({ open, onOpenChange }: Props) {
                     aria-checked={active}
                     onClick={() => setNecessity(opt.value)}
                     className={cn(
-                      "group flex flex-col items-start gap-0.5 border-r border-rule px-4 py-3 text-left transition-colors last:border-r-0",
+                      "h-8 rounded border px-2 text-[12px] font-medium transition-colors",
                       active
-                        ? "bg-ink text-paper"
-                        : "bg-card text-ink hover:bg-paper-deep"
+                        ? "border-accent bg-accent-fade text-accent"
+                        : "border-ink-4 bg-surface text-ink-2 hover:border-ink hover:text-ink"
                     )}
                   >
-                    <span className="font-heading text-base tracking-tight">
-                      {opt.label}
-                    </span>
-                    <span
-                      className={cn(
-                        "text-[11px]",
-                        active ? "text-paper/70" : "text-ink-subtle"
-                      )}
-                    >
-                      {opt.hint}
-                    </span>
+                    {opt.label}
                   </button>
                 );
               })}
@@ -261,17 +216,16 @@ export function InterventionModal({ open, onOpenChange }: Props) {
 
           {/* Alternatives */}
           {showAlternatives && (
-            <div className="space-y-2">
-              <div className="text-[10px] font-medium uppercase tracking-[0.22em] text-ink-subtle">
-                In-budget alternatives
-              </div>
+            <div className="space-y-2 border-t border-ink-4 pt-4">
+              <span className="font-mono text-[11px] uppercase tracking-[0.06em] text-ink-3">
+                Cheaper alternatives
+              </span>
               {alternatives.length === 0 ? (
-                <p className="text-sm italic text-ink-muted">
-                  No in-budget alternatives in this category. Save for 24 hours
-                  is a quieter option.
+                <p className="font-mono text-[12px] text-ink-3">
+                  None within budget. Save for 24h instead.
                 </p>
               ) : (
-                <div className="divide-y divide-rule rounded-lg border border-rule bg-card">
+                <div className="border-t border-ink-4">
                   {alternatives.map((alt) => {
                     const inCart = state.cart.find(
                       (l) => l.itemId === alt.id
@@ -279,39 +233,38 @@ export function InterventionModal({ open, onOpenChange }: Props) {
                     return (
                       <div
                         key={alt.id}
-                        className="flex items-center gap-3 px-4 py-3"
+                        className="flex h-12 items-center gap-3 border-b border-ink-4"
                       >
-                        <div className="relative size-12 shrink-0 overflow-hidden rounded-md bg-paper-deep">
+                        <div className="relative size-7 shrink-0 overflow-hidden rounded-sm bg-surface-2">
                           <Image
-                            src={unsplashUrl(alt.imageId, 96)}
-                            alt={alt.name}
+                            src={unsplashUrl(alt.imageId, 64)}
+                            alt=""
                             fill
-                            sizes="48px"
+                            sizes="28px"
                             className="object-cover"
                           />
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="truncate font-heading text-sm tracking-tight text-ink">
-                            {alt.name}
-                          </div>
-                          <div className="font-mono text-[11px] num-tabular text-ink-subtle">
-                            {formatCurrency(alt.price)}
-                          </div>
-                        </div>
-                        <Button
-                          size="sm"
-                          variant={inCart ? "secondary" : "outline"}
-                          className={cn(
-                            "border-ink/15 text-ink hover:bg-ink hover:text-paper",
-                            inCart &&
-                              "border-sage/30 bg-sage-soft text-ink hover:bg-sage-soft hover:text-ink"
-                          )}
+                        <span className="flex-1 truncate text-[13px] text-ink">
+                          {alt.name}
+                        </span>
+                        <span className="font-mono text-[12px] num-tabular text-ink-2">
+                          {formatCurrency(alt.price)}
+                        </span>
+                        <button
                           onClick={() =>
-                            inCart ? removeFromCart(alt.id) : addToCart(alt.id)
+                            inCart
+                              ? removeFromCart(alt.id)
+                              : addToCart(alt.id)
                           }
+                          className={cn(
+                            "h-7 rounded border px-2 font-mono text-[11px] transition-colors",
+                            inCart
+                              ? "border-accent bg-accent-fade text-accent"
+                              : "border-ink-4 text-ink-2 hover:border-ink hover:bg-ink hover:text-paper"
+                          )}
                         >
-                          {inCart ? "Remove" : "Swap in"}
-                        </Button>
+                          {inCart ? "Remove" : "Swap"}
+                        </button>
                       </div>
                     );
                   })}
@@ -321,56 +274,48 @@ export function InterventionModal({ open, onOpenChange }: Props) {
           )}
         </div>
 
-        {/* Action footer with subtle separator */}
-        <div className="border-t border-rule bg-paper-deep/40 p-5 sm:p-6">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            {!showAlternatives ? (
-              <button
-                type="button"
-                onClick={() => setShowAlternatives(true)}
-                className="text-left text-[12px] uppercase tracking-[0.18em] text-ink-muted underline-offset-4 hover:text-ink hover:underline"
-              >
-                See cheaper alternatives →
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setShowAlternatives(false)}
-                className="text-left text-[12px] uppercase tracking-[0.18em] text-ink-muted underline-offset-4 hover:text-ink hover:underline"
-              >
-                ← Back
-              </button>
-            )}
+        {/* Action footer */}
+        <div className="flex flex-col gap-2 border-t border-ink-4 bg-surface-2/50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          {!showAlternatives ? (
+            <button
+              type="button"
+              onClick={() => setShowAlternatives(true)}
+              className="text-left font-mono text-[11px] text-ink-3 hover:text-ink hover:underline"
+            >
+              See alternatives →
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowAlternatives(false)}
+              className="text-left font-mono text-[11px] text-ink-3 hover:text-ink hover:underline"
+            >
+              ← Back
+            </button>
+          )}
 
-            <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center">
-              <Button
-                variant={isStrict ? "outline" : "ghost"}
-                onClick={handleBuy}
-                className={cn(
-                  "justify-center",
-                  isStrict
-                    ? "border-rule text-ink-muted hover:bg-paper-deep hover:text-ink"
-                    : "text-ink hover:bg-paper-deep"
-                )}
-              >
-                <ShoppingBag className="size-4" />
-                Buy now · {formatCurrency(breakdown.total)}
-              </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              onClick={handleBuy}
+              className="text-ink-2 hover:bg-surface-2 hover:text-ink"
+            >
+              Buy now
+            </Button>
+            <div className="flex items-center gap-1.5">
+              {isStrict && (
+                <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-accent">
+                  Recommended
+                </span>
+              )}
               <Button
                 onClick={handleSave}
-                className="justify-center bg-ink text-paper hover:bg-ink/90"
+                className="bg-accent text-white hover:bg-accent/90"
               >
-                <Clock className="size-4" />
-                Save for 24 hours
-                <ArrowRight className="size-4" />
+                Save for 24h
               </Button>
             </div>
           </div>
-          {isStrict && (
-            <p className="mt-3 text-right font-heading text-[12px] italic text-ink-muted">
-              Strict mode — saving is the recommended path.
-            </p>
-          )}
         </div>
       </DialogContent>
     </Dialog>

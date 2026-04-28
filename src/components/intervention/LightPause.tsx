@@ -7,7 +7,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 
 const PAUSE_SECONDS = 5;
 
@@ -43,48 +42,40 @@ export function LightPause({ open, onOpenChange, onComplete }: Props) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="max-w-md border-rule bg-paper p-0 shadow-[0_24px_60px_-24px_rgba(20,20,30,0.25)]"
+        className="max-w-sm gap-0 rounded-md border border-ink-4 bg-surface p-0 shadow-none"
         showCloseButton={false}
       >
-        <div className="flex flex-col items-center gap-6 px-8 py-12 text-center">
-          <DialogTitle className="font-heading text-3xl italic leading-tight tracking-tight text-ink">
-            Take a breath.
-          </DialogTitle>
-
-          <p className="max-w-xs text-sm text-ink-muted">
-            A five-second pause. The shortest pause we offer.
-          </p>
-
-          <div className="relative h-px w-60 bg-rule">
+        <DialogTitle className="sr-only">Light pause</DialogTitle>
+        <div className="flex flex-col items-center gap-6 px-8 py-12">
+          <div className="text-[96px] font-medium leading-none tracking-[-0.04em] text-ink num-tabular">
+            {remaining}
+          </div>
+          <div className="relative h-px w-60 bg-ink-4">
             <div
-              className="absolute inset-y-0 left-0 bg-[oklch(0.55_0.10_35)] transition-[width] duration-100 ease-linear"
+              className="absolute inset-y-0 left-0 bg-accent transition-[width] duration-100 ease-linear"
               style={{ width: `${pct}%` }}
             />
           </div>
-
-          <div className="font-mono text-xs num-tabular text-ink-subtle">
-            {done ? "Ready when you are" : `${remaining}s`}
+          <div className="font-mono text-[11px] uppercase tracking-[0.08em] text-ink-3">
+            Hold to checkout · 5s
           </div>
-
-          <div className="flex w-full justify-center gap-2 pt-2">
-            <Button
-              variant="ghost"
-              onClick={() => onOpenChange(false)}
-              className="text-ink-muted hover:bg-paper-deep"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={onComplete}
-              disabled={!done}
-              className={cn(
-                "bg-ink text-paper hover:bg-ink/90",
-                !done && "opacity-50"
-              )}
-            >
-              Continue to checkout
-            </Button>
-          </div>
+          {done && (
+            <div className="flex w-full justify-center gap-2 border-t border-ink-4 pt-4">
+              <Button
+                variant="ghost"
+                onClick={() => onOpenChange(false)}
+                className="text-ink-2 hover:bg-surface-2 hover:text-ink"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={onComplete}
+                className="bg-accent text-white hover:bg-accent/90"
+              >
+                Continue
+              </Button>
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>
