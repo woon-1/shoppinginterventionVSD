@@ -166,3 +166,13 @@
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.01em;
 }
+
+/* Sonner uses a fixed layer with a very high z-index; keep the tray from
+   intercepting clicks when there are no toasts (empty overlay bug). */
+[data-sonner-toaster] {
+  pointer-events: none;
+}
+[data-sonner-toaster] [data-sonner-toast],
+[data-sonner-toaster] li {
+  pointer-events: auto;
+}

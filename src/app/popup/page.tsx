@@ -15,26 +15,6 @@ function getPageUrl(page: string) {
   return `/${page}`;
 }
 
-function openPage(page: string) {
-  const url = getPageUrl(page);
-
-  if (typeof chrome !== "undefined" && chrome.tabs?.create) {
-    chrome.tabs.create({ url });
-    return;
-  }
-
-  window.location.assign(url);
-}
-
-function openSettingsPage() {
-  if (typeof chrome !== "undefined" && chrome.runtime?.openOptionsPage) {
-    chrome.runtime.openOptionsPage();
-    return;
-  }
-
-  window.location.assign(getPageUrl("settings.html"));
-}
-
 export default function PopupPage() {
   const { state, hydrated } = useAppState();
 
@@ -57,15 +37,15 @@ export default function PopupPage() {
               extension.
             </p>
           </div>
-          <button
-            onClick={() => openPage("setup.html")}
+          <a
+            href={getPageUrl("setup.html")}
             className={cn(
               buttonVariants({ variant: "default" }),
-              "w-full bg-ink text-paper hover:bg-ink/90"
+              "no-underline w-full bg-ink text-paper hover:bg-ink/90"
             )}
           >
             Start setup
-          </button>
+          </a>
         </div>
       </div>
     );
@@ -102,56 +82,56 @@ export default function PopupPage() {
         </div>
 
         <div className="space-y-2">
-          <button
-            onClick={() => openPage("dashboard.html")}
+          <a
+            href={getPageUrl("dashboard.html")}
             className={cn(
               buttonVariants({ variant: "default" }),
-              "w-full bg-ink text-paper hover:bg-ink/90"
+              "no-underline w-full bg-ink text-paper hover:bg-ink/90"
             )}
           >
             <LayoutDashboard className="size-3.5" />
             Dashboard
-          </button>
-          <button
-            onClick={() => openPage("shop.html")}
+          </a>
+          <a
+            href={getPageUrl("shop.html")}
             className={cn(
               buttonVariants({ variant: "outline" }),
-              "w-full border-ink-4 text-ink hover:bg-surface-2"
+              "no-underline w-full border-ink-4 text-ink hover:bg-surface-2"
             )}
           >
             <Store className="size-3.5" />
             Shop
-          </button>
-          <button
-            onClick={() => openPage("cart.html")}
+          </a>
+          <a
+            href={getPageUrl("cart.html")}
             className={cn(
               buttonVariants({ variant: "outline" }),
-              "w-full border-ink-4 text-ink hover:bg-surface-2"
+              "no-underline w-full border-ink-4 text-ink hover:bg-surface-2"
             )}
           >
             <ShoppingCart className="size-3.5" />
             Cart
-          </button>
-          <button
-            onClick={() => openPage("wishlist.html")}
+          </a>
+          <a
+            href={getPageUrl("wishlist.html")}
             className={cn(
               buttonVariants({ variant: "outline" }),
-              "w-full border-ink-4 text-ink hover:bg-surface-2"
+              "no-underline w-full border-ink-4 text-ink hover:bg-surface-2"
             )}
           >
             <Bookmark className="size-3.5" />
             Wishlist
-          </button>
-          <button
-            onClick={openSettingsPage}
+          </a>
+          <a
+            href={getPageUrl("settings.html")}
             className={cn(
               buttonVariants({ variant: "ghost" }),
-              "w-full justify-start text-ink-2 hover:bg-surface-2 hover:text-ink"
+              "no-underline w-full justify-start text-ink-2 hover:bg-surface-2 hover:text-ink"
             )}
           >
             <Settings className="size-3.5" />
             Settings
-          </button>
+          </a>
         </div>
 
         {pending.length > 0 && (

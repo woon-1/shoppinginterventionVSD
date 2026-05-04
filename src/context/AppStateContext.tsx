@@ -69,16 +69,24 @@ export function AppStateProvider({
 }: {
   children: React.ReactNode;
 }) {
-  const [state, setState] = useState<AppState>(DEFAULT_STATE);
-  const [hydrated, setHydrated] = useState(false);
+  const [state, setState] = useState<AppState>(() => {
+    if (typeof window === "undefined") return DEFAULT_STATE;
+    return loadState();
+  });
+  // Client: ready on first paint so extension UI is not stuck behind an effect tick.
+  const [hydrated, setHydrated] = useState(
+    () => typeof window !== "undefined"
+  );
   const stateRef = useRef(state);
   stateRef.current = state;
 
-  // Hydrate from localStorage first, then mirror any extension storage state.
+  // Re-read storage after mount; merge Chrome extension storage when present.
   useEffect(() => {
     const loaded = loadState();
     setState(loaded);
-    setHydrated(true);
+    if (typeof window !== "undefined") {
+      setHydrated(true);
+    }
 
     let cancelled = false;
 
