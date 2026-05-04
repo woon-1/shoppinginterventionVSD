@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "NEXT_EXTENSION_ASSETS=1 next build",
-    "postbuild": "node scripts/build-extension.mjs && node scripts/clean-extension-build.mjs",
+    "postbuild": "node scripts/build-extension.mjs && node scripts/clean-extension-build.mjs && node scripts/patch-extension-csp.mjs",
     "start": "next start",
     "lint": "eslint"
   },
