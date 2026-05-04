@@ -1,7 +1,5 @@
-"use client";
-
-import { SetupWizard } from "@/components/setup/SetupWizard";
+import SetupContent from "./SetupContent";
 
 export default function SetupPage() {
-  return <SetupWizard />;
+  return <SetupContent />;
 }

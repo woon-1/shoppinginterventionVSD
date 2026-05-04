@@ -23,6 +23,7 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { extensionAwareReplace } from "@/lib/extension-nav";
+import { getExtensionPageUrl } from "@/lib/extension-url";
 
 const FRICTION_META: Record<FrictionLevel, { name: string; desc: string }> = {
   light: { name: "Light", desc: "Five-second pause." },
@@ -71,10 +72,19 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-12">
-      <header>
+      <header className="space-y-2">
         <h1 className="text-[40px] font-semibold leading-tight tracking-[-0.03em] text-ink">
           Settings
         </h1>
+        <p className="max-w-xl text-[14px] leading-relaxed text-ink-2">
+          <a
+            href={getExtensionPageUrl("setup.html?intro=1")}
+            className="font-medium text-ink underline decoration-ink-4 underline-offset-[3px] hover:decoration-ink"
+          >
+            Replay the introduction walkthrough
+          </a>{" "}
+          anytime — how Pause works on stores, your privacy, friction, and bypassing when a purchase is intentional.
+        </p>
       </header>
 
       <div className="grid gap-12 lg:grid-cols-2 lg:items-start">

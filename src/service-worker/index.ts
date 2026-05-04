@@ -41,18 +41,15 @@ async function saveStoredState(state: AppState): Promise<void> {
   await chrome.storage.local.set({ [STORAGE_KEY]: state });
 }
 
-function openExtensionSurface(page: string) {
-  chrome.tabs.create({ url: chrome.runtime.getURL(page) });
-}
+const INSTALL_META_KEY = "pause.installMeta.v1";
 
-async function handleExtensionClick() {
-  const state = await getStoredState();
-  const page = state.config?.onboardingComplete ? "popup.html" : "setup.html";
-  openExtensionSurface(page);
-}
-
-chrome.action.onClicked.addListener(() => {
-  void handleExtensionClick();
+chrome.runtime.onInstalled.addListener((details) => {
+  void chrome.storage.local.set({
+    [INSTALL_META_KEY]: {
+      installedAt: Date.now(),
+      reason: details.reason,
+    },
+  });
 });
 
 chrome.runtime.onMessage.addListener(

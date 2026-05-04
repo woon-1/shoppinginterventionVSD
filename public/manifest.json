@@ -1,10 +1,11 @@
 {
   "manifest_version": 3,
   "name": "Pause",
-  "version": "0.1.0",
-  "description": "A value-sensitive shopping intervention with local-only state.",
+  "version": "0.1.1",
+  "description": "Pause before you buy — gentle reflection and spending awareness for online shopping. Local-only; you stay in control.",
   "action": {
-    "default_title": "Pause"
+    "default_title": "Pause — reflection & budget",
+    "default_popup": "popup.html"
   },
   "options_ui": {
     "page": "settings.html",

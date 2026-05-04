@@ -1,4 +1,5 @@
 import { AppState, DEFAULT_STATE, STORAGE_KEY } from "./types";
+import { clearSetupIntro } from "./setup-intro";
 
 export function loadState(): AppState {
   if (typeof window === "undefined") return DEFAULT_STATE;
@@ -26,6 +27,7 @@ export function wipeState(): void {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.removeItem(STORAGE_KEY);
+    clearSetupIntro();
   } catch {
     // ignore
   }
