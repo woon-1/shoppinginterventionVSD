@@ -1,0 +1,101 @@
+{
+  "manifest_version": 3,
+  "name": "Pause",
+  "version": "0.1.0",
+  "description": "A value-sensitive shopping intervention with local-only state.",
+  "action": {
+    "default_title": "Pause"
+  },
+  "options_ui": {
+    "page": "settings.html",
+    "open_in_tab": true
+  },
+  "permissions": ["storage", "tabs"],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "next/static/*",
+        "next/_*",
+        "favicon.ico",
+        "*.js",
+        "*.css",
+        "*.woff2"
+      ],
+      "matches": ["<all_urls>"]
+    }
+  ],
+  "host_permissions": [
+    "*://www.amazon.com/*",
+    "*://www.amazon.com.br/*",
+    "*://www.amazon.ca/*",
+    "*://www.amazon.co.uk/*",
+    "*://www.amazon.de/*",
+    "*://www.amazon.fr/*",
+    "*://www.amazon.it/*",
+    "*://www.amazon.es/*",
+    "*://www.amazon.co.jp/*",
+    "*://www.amazon.in/*",
+    "*://www.ebay.com/*",
+    "*://www.ebay.co.uk/*",
+    "*://www.ebay.de/*",
+    "*://www.ebay.ca/*",
+    "*://www.ebay.au/*",
+    "*://www.etsy.com/*",
+    "*://www.target.com/*",
+    "*://www.walmart.com/*",
+    "*://www.walmart.ca/*",
+    "*://supercenter.walmart.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "*://www.amazon.com/dp/*",
+        "*://www.amazon.com/gp/product/*",
+        "*://www.amazon.com.br/dp/*",
+        "*://www.amazon.ca/dp/*",
+        "*://www.amazon.ca/gp/product/*",
+        "*://www.amazon.co.uk/dp/*",
+        "*://www.amazon.de/dp/*",
+        "*://www.amazon.fr/dp/*",
+        "*://www.amazon.it/dp/*",
+        "*://www.amazon.es/dp/*",
+        "*://www.amazon.co.jp/dp/*",
+        "*://www.amazon.in/dp/*"
+      ],
+      "js": ["content-amazon.js"]
+    },
+    {
+      "matches": [
+        "*://www.ebay.com/itm/*",
+        "*://www.ebay.co.uk/itm/*",
+        "*://www.ebay.de/itm/*",
+        "*://www.ebay.ca/itm/*",
+        "*://www.ebay.au/itm/*"
+      ],
+      "js": ["content-ebay.js"]
+    },
+    {
+      "matches": [
+        "*://www.etsy.com/listing/*"
+      ],
+      "js": ["content-etsy.js"]
+    },
+    {
+      "matches": [
+        "*://www.target.com/p/*"
+      ],
+      "js": ["content-target.js"]
+    },
+    {
+      "matches": [
+        "*://www.walmart.com/ip/*",
+        "*://www.walmart.ca/ip/*",
+        "*://supercenter.walmart.com/ip/*"
+      ],
+      "js": ["content-walmart.js"]
+    }
+  ],
+  "background": {
+    "service_worker": "service-worker.js"
+  }
+}

@@ -125,5 +125,20 @@ export function unsplashUrl(
   width: number,
   height: number = width
 ): string {
-  return `https://images.unsplash.com/photo-${id}?w=${width}&h=${height}&fit=crop&auto=format&q=80`;
+  // For extension compatibility, use data URI placeholder instead of external Unsplash URL
+  // Find the emoji for this item to display in the placeholder
+  const item = CATALOG.find((i) => i.imageId === id);
+  const emoji = item?.emoji || "📦";
+
+  // Create a simple SVG placeholder with the emoji
+  const svg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+    <rect width="${width}" height="${height}" fill="#f3f4f6"/>
+    <text x="50%" y="50%" font-size="${Math.floor(width * 0.5)}" text-anchor="middle" dy="0.3em" dominant-baseline="middle">
+      ${emoji}
+    </text>
+  </svg>`;
+
+  const encoded = encodeURIComponent(svg);
+  return `data:image/svg+xml;utf8,${encoded}`;
 }
+

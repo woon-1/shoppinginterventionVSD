@@ -84,12 +84,24 @@ export interface SavingsLedger {
   byDay: Record<string, number>;
 }
 
+export interface WishlistItem {
+  id: string;
+  name: string;
+  price: number;
+  currency: string;
+  website: "amazon" | "ebay" | "etsy" | "target" | "walmart";
+  url: string;
+  imageUrl?: string;
+  addedAt: number;
+}
+
 export interface AppState {
   config: UserConfig | null;
   cart: CartLine[];
   coolingOff: CoolingOffEntry[];
   purchases: PurchaseRecord[];
   savings: SavingsLedger;
+  wishlist: WishlistItem[];
   schemaVersion: 1;
 }
 
@@ -104,6 +116,7 @@ export const DEFAULT_STATE: AppState = {
     longestSkipStreak: 0,
     byDay: {},
   },
+  wishlist: [],
   schemaVersion: 1,
 };
 
