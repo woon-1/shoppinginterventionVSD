@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
+import { extensionAwareReplace } from "@/lib/extension-nav";
 
 const STEPS = ["Budget", "Essentials", "Friction", "Goal"] as const;
 
@@ -84,7 +85,7 @@ export function SetupWizard() {
       onboardingComplete: true,
     };
     setConfig(config);
-    router.replace("/shop");
+    extensionAwareReplace(router, "/shop");
   }
 
   function toggleCategory(cat: ItemCategory) {

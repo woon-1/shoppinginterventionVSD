@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { LightPause } from "./LightPause";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { extensionAwareReplace } from "@/lib/extension-nav";
 
 interface Props {
   open: boolean;
@@ -81,7 +82,7 @@ export function InterventionModal({ open, onOpenChange }: Props) {
             description: `${formatCurrency(breakdown.total)} charged.`,
           });
           onOpenChange(false);
-          router.replace("/dashboard");
+          extensionAwareReplace(router, "/dashboard");
         }}
       />
     );
@@ -105,7 +106,7 @@ export function InterventionModal({ open, onOpenChange }: Props) {
       description: `${formatCurrency(breakdown!.total)} charged.`,
     });
     onOpenChange(false);
-    router.replace("/dashboard");
+    extensionAwareReplace(router, "/dashboard");
   }
 
   function handleSave() {
@@ -116,7 +117,7 @@ export function InterventionModal({ open, onOpenChange }: Props) {
         : "If you don't return to buy, the amount counts toward your savings.",
     });
     onOpenChange(false);
-    router.replace("/dashboard");
+    extensionAwareReplace(router, "/dashboard");
   }
 
   const isStrict = decision.level === "strict";

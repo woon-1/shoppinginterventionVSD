@@ -17,6 +17,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { InterventionModal } from "@/components/intervention/InterventionModal";
 import { toast } from "sonner";
+import { extensionAwareReplace } from "@/lib/extension-nav";
 
 export default function CartPage() {
   const router = useRouter();
@@ -26,7 +27,7 @@ export default function CartPage() {
 
   useEffect(() => {
     if (hydrated && !state.config?.onboardingComplete) {
-      router.replace("/setup");
+      extensionAwareReplace(router, "/setup");
     }
   }, [hydrated, state.config, router]);
 
@@ -67,7 +68,7 @@ export default function CartPage() {
     toast.success("Purchase complete", {
       description: `${formatCurrency(total)} · essentials only.`,
     });
-    router.replace("/dashboard");
+    extensionAwareReplace(router, "/dashboard");
   }
 
   if (lines.length === 0) {

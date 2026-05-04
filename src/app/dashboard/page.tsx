@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAppState } from "@/context/AppStateContext";
+import { extensionAwareReplace } from "@/lib/extension-nav";
 import { SavingsHero } from "@/components/dashboard/SavingsHero";
 import { KpiStrip } from "@/components/dashboard/KpiStrip";
 import { WeeklyChart } from "@/components/dashboard/WeeklyChart";
@@ -14,7 +15,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (hydrated && !state.config?.onboardingComplete) {
-      router.replace("/setup");
+      extensionAwareReplace(router, "/setup");
     }
   }, [hydrated, state.config, router]);
 

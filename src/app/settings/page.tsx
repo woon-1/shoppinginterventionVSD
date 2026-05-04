@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { extensionAwareReplace } from "@/lib/extension-nav";
 
 const FRICTION_META: Record<FrictionLevel, { name: string; desc: string }> = {
   light: { name: "Light", desc: "Five-second pause." },
@@ -38,7 +39,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (hydrated && !state.config?.onboardingComplete) {
-      router.replace("/setup");
+      extensionAwareReplace(router, "/setup");
     }
   }, [hydrated, state.config, router]);
 
@@ -282,7 +283,7 @@ export default function SettingsPage() {
             <Button
               onClick={() => {
                 wipe();
-                router.replace("/setup");
+                extensionAwareReplace(router, "/setup");
               }}
               className="bg-negative text-white hover:bg-negative/90"
             >

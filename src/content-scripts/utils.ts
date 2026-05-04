@@ -144,6 +144,10 @@ export function injectButton(
   button.setAttribute("data-pause-wishlist-button", website);
   button.textContent = "Add to Wishlist";
   button.style.cssText = `
+    position: relative;
+    z-index: 2147483646;
+    isolation: isolate;
+    pointer-events: auto;
     padding: 10px 16px;
     margin: 8px 0;
     background-color: #111827;

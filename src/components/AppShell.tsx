@@ -17,9 +17,14 @@ const NAV = [
 
 const HIDDEN_PATHS = new Set(["/", "/setup", "/popup", "/popup.html"]);
 
+function normalizePathname(pathname: string | null | undefined) {
+  if (!pathname) return "";
+  return pathname.replace(/\.html$/, "").replace(/\/$/, "") || "/";
+}
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const normalizedPathname = pathname?.replace(/\.html$/, "") ?? pathname;
+  const normalizedPathname = normalizePathname(pathname);
   const { state, hydrated } = useAppState();
   const hidden = HIDDEN_PATHS.has(normalizedPathname);
 
