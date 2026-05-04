@@ -10,7 +10,7 @@ export function PopupWelcome() {
   const setupUrl = getExtensionPageUrl("setup.html");
 
   return (
-    <div className="w-[min(22rem,calc(100vw-1rem))] space-y-4 px-3 py-4 text-ink">
+    <div className="box-border w-full max-w-full space-y-4 px-3 py-4 text-ink">
       <div className="flex items-start gap-2">
         <Leaf
           className="mt-0.5 size-5 shrink-0 text-accent"

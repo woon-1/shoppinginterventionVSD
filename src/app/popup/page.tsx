@@ -9,23 +9,15 @@ export default function PopupPage() {
 
   if (!hydrated) {
     return (
-      <div className="flex min-h-[120px] items-center justify-center bg-paper px-4 py-8 text-sm text-ink-3">
+      <div className="flex min-h-[200px] items-center justify-center px-4 py-8 text-sm text-ink-3">
         Loading…
       </div>
     );
   }
 
   if (!state.config?.onboardingComplete) {
-    return (
-      <div className="max-h-[min(560px,calc(100vh-12px))] overflow-y-auto overflow-x-hidden bg-paper">
-        <PopupWelcome />
-      </div>
-    );
+    return <PopupWelcome />;
   }
 
-  return (
-    <div className="max-h-[min(560px,calc(100vh-12px))] overflow-y-auto overflow-x-hidden bg-paper">
-      <PopupActive />
-    </div>
-  );
+  return <PopupActive />;
 }

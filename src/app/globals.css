@@ -176,3 +176,52 @@
 [data-sonner-toaster] li {
   pointer-events: auto;
 }
+
+/* ─── chrome.browserAction default_popup (popup.html only) ───
+   Fixed viewport so the popup panel is not sized as a thin column. */
+html:has(.extension-popup-shell),
+html:has(.extension-popup-shell) body {
+  width: 360px;
+  min-width: 360px;
+  max-width: 360px;
+  height: 520px;
+  min-height: 520px;
+  max-height: 520px;
+  margin: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+html:has(.extension-popup-shell) body {
+  display: flex;
+  flex-direction: column;
+}
+
+html:has(.extension-popup-shell) body > * {
+  min-width: 0;
+  min-height: 0;
+}
+
+.extension-popup-shell {
+  box-sizing: border-box;
+  width: 360px;
+  min-width: 360px;
+  max-width: 360px;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  background-color: var(--paper);
+}
+
+.extension-popup-scroll {
+  box-sizing: border-box;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  max-width: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+}

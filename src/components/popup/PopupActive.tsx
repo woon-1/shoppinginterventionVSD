@@ -82,7 +82,7 @@ export function PopupActive() {
   const withinBudget = remaining >= 0;
 
   return (
-    <div className="w-[min(22rem,calc(100vw-1rem))] space-y-4 px-3 py-4 text-ink">
+    <div className="box-border w-full max-w-full space-y-4 px-3 py-4 text-ink">
       <header className="flex items-start gap-2">
         <Leaf className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden />
         <div className="min-w-0 space-y-1">
