@@ -8,6 +8,8 @@ import {
   injectReflectionPrompt,
   ProductData,
 } from "./utils";
+import { detectCartCheckoutContext } from "./cart-detection";
+import { mountCartIntervention } from "./cart-intervention-ui";
 
 function extractEtsyProduct(): ProductData | null {
   try {
@@ -82,15 +84,33 @@ function initEtsyWishlistButton() {
   }
 }
 
+function routeEtsyFeatures() {
+  const ctx = detectCartCheckoutContext("etsy", window.location.href);
+  if (ctx.active) {
+    if (!document.querySelector("[data-pause-cart-host]")) {
+      void mountCartIntervention("etsy", ctx.kind);
+    }
+    return;
+  }
+  initEtsyWishlistButton();
+}
+
 // Initialize when DOM is ready
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", initEtsyWishlistButton);
+  document.addEventListener("DOMContentLoaded", routeEtsyFeatures);
 } else {
-  initEtsyWishlistButton();
+  routeEtsyFeatures();
 }
 
 // Also try to initialize on dynamic content changes
 const observer = new MutationObserver(() => {
+  const ctx = detectCartCheckoutContext("etsy", window.location.href);
+  if (ctx.active) {
+    if (!document.querySelector("[data-pause-cart-host]")) {
+      void mountCartIntervention("etsy", ctx.kind);
+    }
+    return;
+  }
   if (!document.querySelector("[data-pause-wishlist-button]")) {
     initEtsyWishlistButton();
   }

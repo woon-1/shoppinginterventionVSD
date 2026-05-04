@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Pause",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Pause before you buy — gentle reflection and spending awareness for online shopping. Local-only; you stay in control.",
   "action": {
     "default_title": "Pause — reflection & budget",
@@ -52,46 +52,108 @@
       "matches": [
         "*://www.amazon.com/dp/*",
         "*://www.amazon.com/gp/product/*",
+        "*://www.amazon.com/gp/cart/*",
+        "*://www.amazon.com/cart/*",
+        "*://www.amazon.com/checkout/*",
         "*://www.amazon.com.br/dp/*",
+        "*://www.amazon.com.br/gp/cart/*",
+        "*://www.amazon.com.br/cart/*",
+        "*://www.amazon.com.br/checkout/*",
         "*://www.amazon.ca/dp/*",
         "*://www.amazon.ca/gp/product/*",
+        "*://www.amazon.ca/gp/cart/*",
+        "*://www.amazon.ca/cart/*",
+        "*://www.amazon.ca/checkout/*",
         "*://www.amazon.co.uk/dp/*",
+        "*://www.amazon.co.uk/gp/cart/*",
+        "*://www.amazon.co.uk/cart/*",
+        "*://www.amazon.co.uk/checkout/*",
         "*://www.amazon.de/dp/*",
+        "*://www.amazon.de/gp/cart/*",
+        "*://www.amazon.de/cart/*",
+        "*://www.amazon.de/checkout/*",
         "*://www.amazon.fr/dp/*",
+        "*://www.amazon.fr/gp/cart/*",
+        "*://www.amazon.fr/cart/*",
+        "*://www.amazon.fr/checkout/*",
         "*://www.amazon.it/dp/*",
+        "*://www.amazon.it/gp/cart/*",
+        "*://www.amazon.it/cart/*",
+        "*://www.amazon.it/checkout/*",
         "*://www.amazon.es/dp/*",
+        "*://www.amazon.es/gp/cart/*",
+        "*://www.amazon.es/cart/*",
+        "*://www.amazon.es/checkout/*",
         "*://www.amazon.co.jp/dp/*",
-        "*://www.amazon.in/dp/*"
+        "*://www.amazon.co.jp/gp/cart/*",
+        "*://www.amazon.co.jp/cart/*",
+        "*://www.amazon.co.jp/checkout/*",
+        "*://www.amazon.in/dp/*",
+        "*://www.amazon.in/gp/cart/*",
+        "*://www.amazon.in/cart/*",
+        "*://www.amazon.in/checkout/*"
       ],
       "js": ["content-amazon.js"]
     },
     {
       "matches": [
         "*://www.ebay.com/itm/*",
+        "*://www.ebay.com/shoppingcart*",
+        "*://www.ebay.com/viewcart*",
+        "*://www.ebay.com/cart*",
+        "*://www.ebay.com/checkout/*",
+        "*://www.ebay.com/sch/checkout/*",
         "*://www.ebay.co.uk/itm/*",
+        "*://www.ebay.co.uk/shoppingcart*",
+        "*://www.ebay.co.uk/viewcart*",
+        "*://www.ebay.co.uk/cart*",
+        "*://www.ebay.co.uk/checkout/*",
         "*://www.ebay.de/itm/*",
+        "*://www.ebay.de/shoppingcart*",
+        "*://www.ebay.de/viewcart*",
+        "*://www.ebay.de/cart*",
+        "*://www.ebay.de/checkout/*",
         "*://www.ebay.ca/itm/*",
-        "*://www.ebay.au/itm/*"
+        "*://www.ebay.ca/shoppingcart*",
+        "*://www.ebay.ca/viewcart*",
+        "*://www.ebay.ca/cart*",
+        "*://www.ebay.ca/checkout/*",
+        "*://www.ebay.au/itm/*",
+        "*://www.ebay.au/shoppingcart*",
+        "*://www.ebay.au/viewcart*",
+        "*://www.ebay.au/cart*",
+        "*://www.ebay.au/checkout/*"
       ],
       "js": ["content-ebay.js"]
     },
     {
       "matches": [
-        "*://www.etsy.com/listing/*"
+        "*://www.etsy.com/listing/*",
+        "*://www.etsy.com/cart*",
+        "*://www.etsy.com/checkout*",
+        "*://www.etsy.com/guest-checkout*"
       ],
       "js": ["content-etsy.js"]
     },
     {
       "matches": [
-        "*://www.target.com/p/*"
+        "*://www.target.com/p/*",
+        "*://www.target.com/cart*",
+        "*://www.target.com/co-*"
       ],
       "js": ["content-target.js"]
     },
     {
       "matches": [
         "*://www.walmart.com/ip/*",
+        "*://www.walmart.com/cart*",
+        "*://www.walmart.com/checkout*",
         "*://www.walmart.ca/ip/*",
-        "*://supercenter.walmart.com/ip/*"
+        "*://www.walmart.ca/cart*",
+        "*://www.walmart.ca/checkout*",
+        "*://supercenter.walmart.com/ip/*",
+        "*://supercenter.walmart.com/cart*",
+        "*://supercenter.walmart.com/checkout*"
       ],
       "js": ["content-walmart.js"]
     }

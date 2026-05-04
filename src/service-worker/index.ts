@@ -2,7 +2,27 @@
 // Listens for messages from content scripts, manages wishlist updates,
 // and opens the appropriate extension surface when the icon is clicked.
 
-import { AppState, DEFAULT_STATE, STORAGE_KEY, WishlistItem } from "@/lib/types";
+import {
+  AppState,
+  DEFAULT_STATE,
+  FrictionLevel,
+  STORAGE_KEY,
+  WishlistItem,
+} from "@/lib/types";
+
+const CART_EVENTS_KEY = "pause.cartInterventionEvents.v1";
+
+interface CartInterventionPayload {
+  kind: "wait_24h" | "continue" | "minimize";
+  host: string;
+  cartTotal: number | null;
+  friction: FrictionLevel;
+}
+
+interface RecordCartInterventionRequest {
+  action: "recordCartIntervention";
+  payload: CartInterventionPayload;
+}
 
 interface AddToWishlistRequest {
   action: "addToWishlist";
@@ -54,16 +74,38 @@ chrome.runtime.onInstalled.addListener((details) => {
 
 chrome.runtime.onMessage.addListener(
   (
-    request: AddToWishlistRequest,
+    request: AddToWishlistRequest | RecordCartInterventionRequest,
     sender: chrome.runtime.MessageSender,
-    sendResponse: (response: AddToWishlistResponse) => void
+    sendResponse: (response: AddToWishlistResponse | { ok: boolean }) => void
   ) => {
     if (request.action === "addToWishlist") {
       void handleAddToWishlist(request, sender, sendResponse);
       return true;
     }
+    if (request.action === "recordCartIntervention") {
+      void appendCartInterventionEvent(request.payload, sender.tab?.id);
+      sendResponse({ ok: true });
+      return true;
+    }
   }
 );
+
+async function appendCartInterventionEvent(
+  payload: CartInterventionPayload,
+  tabId?: number
+) {
+  try {
+    const data = await chrome.storage.local.get(CART_EVENTS_KEY);
+    const prev = (data[CART_EVENTS_KEY] as unknown[]) ?? [];
+    const next = [
+      ...prev,
+      { ...payload, at: Date.now(), tabId },
+    ].slice(-40);
+    await chrome.storage.local.set({ [CART_EVENTS_KEY]: next });
+  } catch (e) {
+    console.warn("[Pause] cart intervention log:", e);
+  }
+}
 
 async function handleAddToWishlist(
   request: AddToWishlistRequest,
@@ -102,7 +144,7 @@ async function handleAddToWishlist(
         item: wishlistItem,
       },
       () => {
-        chrome.runtime.lastError;
+        void chrome.runtime.lastError;
       }
     );
 

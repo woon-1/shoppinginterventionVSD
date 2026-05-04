@@ -8,6 +8,8 @@ import {
   injectReflectionPrompt,
   ProductData,
 } from "./utils";
+import { detectCartCheckoutContext } from "./cart-detection";
+import { mountCartIntervention } from "./cart-intervention-ui";
 
 function extractWalmartProduct(): ProductData | null {
   try {
@@ -82,15 +84,33 @@ function initWalmartWishlistButton() {
   }
 }
 
+function routeWalmartFeatures() {
+  const ctx = detectCartCheckoutContext("walmart", window.location.href);
+  if (ctx.active) {
+    if (!document.querySelector("[data-pause-cart-host]")) {
+      void mountCartIntervention("walmart", ctx.kind);
+    }
+    return;
+  }
+  initWalmartWishlistButton();
+}
+
 // Initialize when DOM is ready
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", initWalmartWishlistButton);
+  document.addEventListener("DOMContentLoaded", routeWalmartFeatures);
 } else {
-  initWalmartWishlistButton();
+  routeWalmartFeatures();
 }
 
 // Also try to initialize on dynamic content changes
 const observer = new MutationObserver(() => {
+  const ctx = detectCartCheckoutContext("walmart", window.location.href);
+  if (ctx.active) {
+    if (!document.querySelector("[data-pause-cart-host]")) {
+      void mountCartIntervention("walmart", ctx.kind);
+    }
+    return;
+  }
   if (!document.querySelector("[data-pause-wishlist-button]")) {
     initWalmartWishlistButton();
   }

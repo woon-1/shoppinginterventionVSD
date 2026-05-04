@@ -70,7 +70,8 @@ function getReflectionCopy(
   };
 }
 
-async function loadExtensionState(): Promise<AppState | null> {
+/** Shared by wishlist flow and cart/checkout intervention. */
+export async function loadExtensionState(): Promise<AppState | null> {
   if (typeof chrome === "undefined" || !chrome.storage?.local) return null;
 
   try {

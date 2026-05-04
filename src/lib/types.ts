@@ -34,6 +34,13 @@ export interface CatalogItem {
   emoji: string;
 }
 
+/** Optional VSD hooks for future personalization (friction tone, reminders). */
+export interface InterventionPreferences {
+  /** Display label for goal type, e.g. travel, emergency fund. */
+  goalTypeLabel?: string;
+  reminderFrequency?: "low" | "standard" | "high";
+}
+
 export interface UserConfig {
   budgetAmount: number;
   budgetPeriod: Period;
@@ -44,6 +51,7 @@ export interface UserConfig {
   demoMode: boolean;
   createdAt: number;
   onboardingComplete: boolean;
+  interventionPreferences?: InterventionPreferences;
 }
 
 export interface CartLine {

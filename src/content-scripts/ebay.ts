@@ -8,6 +8,8 @@ import {
   injectReflectionPrompt,
   ProductData,
 } from "./utils";
+import { detectCartCheckoutContext } from "./cart-detection";
+import { mountCartIntervention } from "./cart-intervention-ui";
 
 function extractEbayProduct(): ProductData | null {
   try {
@@ -80,15 +82,33 @@ function initEbayWishlistButton() {
   }
 }
 
+function routeEbayFeatures() {
+  const ctx = detectCartCheckoutContext("ebay", window.location.href);
+  if (ctx.active) {
+    if (!document.querySelector("[data-pause-cart-host]")) {
+      void mountCartIntervention("ebay", ctx.kind);
+    }
+    return;
+  }
+  initEbayWishlistButton();
+}
+
 // Initialize when DOM is ready
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", initEbayWishlistButton);
+  document.addEventListener("DOMContentLoaded", routeEbayFeatures);
 } else {
-  initEbayWishlistButton();
+  routeEbayFeatures();
 }
 
 // Also try to initialize on dynamic content changes
 const observer = new MutationObserver(() => {
+  const ctx = detectCartCheckoutContext("ebay", window.location.href);
+  if (ctx.active) {
+    if (!document.querySelector("[data-pause-cart-host]")) {
+      void mountCartIntervention("ebay", ctx.kind);
+    }
+    return;
+  }
   if (!document.querySelector("[data-pause-wishlist-button]")) {
     initEbayWishlistButton();
   }
