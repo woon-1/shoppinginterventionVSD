@@ -7,17 +7,17 @@ import { useAppState } from "@/context/AppStateContext";
 export default function PopupPage() {
   const { state, hydrated } = useAppState();
 
-  if (!hydrated) {
-    return (
-      <div className="flex min-h-[200px] items-center justify-center px-4 py-8 text-sm text-ink-3">
-        Loading…
-      </div>
-    );
-  }
-
-  if (!state.config?.onboardingComplete) {
-    return <PopupWelcome />;
-  }
-
-  return <PopupActive />;
+  return (
+    <div className="extension-popup-panel box-border w-full min-w-0 max-w-full">
+      {!hydrated ? (
+        <div className="flex min-h-[280px] items-center justify-center px-4 py-10 text-sm text-ink-3">
+          Loading…
+        </div>
+      ) : !state.config?.onboardingComplete ? (
+        <PopupWelcome />
+      ) : (
+        <PopupActive />
+      )}
+    </div>
+  );
 }

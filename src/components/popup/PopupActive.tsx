@@ -19,7 +19,7 @@ import { UserConfig } from "@/lib/types";
 import { HintTooltip } from "@/components/ui/hint-tooltip";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { getExtensionPageUrl } from "@/lib/extension-url";
+import { extensionFullPageLinkProps } from "@/lib/extension-url";
 
 const REFLECTION_PROMPTS = [
   "Do I need this?",
@@ -72,17 +72,10 @@ export function PopupActive() {
 
   const [showPauseKit, setShowPauseKit] = useState(false);
 
-  const dashboardUrl = getExtensionPageUrl("dashboard.html");
-  const shopUrl = getExtensionPageUrl("shop.html");
-  const cartUrl = getExtensionPageUrl("cart.html");
-  const wishlistUrl = getExtensionPageUrl("wishlist.html");
-  const settingsUrl = getExtensionPageUrl("settings.html");
-  const setupIntroUrl = getExtensionPageUrl("setup.html?intro=1");
-
   const withinBudget = remaining >= 0;
 
   return (
-    <div className="box-border w-full max-w-full space-y-4 px-3 py-4 text-ink">
+    <div className="box-border w-full min-w-0 max-w-full space-y-4 px-3 py-4 text-ink">
       <header className="flex items-start gap-2">
         <Leaf className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden />
         <div className="min-w-0 space-y-1">
@@ -105,14 +98,14 @@ export function PopupActive() {
         className="rounded-xl border border-ink-4 bg-paper px-3 py-3"
         aria-label="Spending pause status"
       >
-        <div className="flex items-center justify-between gap-2 text-[11px] font-medium uppercase tracking-[0.06em] text-ink-3">
-          <span className="flex items-center gap-1">
+        <div className="flex min-w-0 items-center justify-between gap-2 text-[11px] font-medium uppercase tracking-[0.06em] text-ink-3">
+          <span className="flex min-w-0 flex-1 items-center gap-1">
             Pause status
             <HintTooltip content="Shows discretionary budget room left this period. Essentials use their own path in the demo shop." />
           </span>
           <span
             className={cn(
-              "rounded px-1.5 py-0.5 font-mono text-[10px] normal-case tracking-normal",
+              "shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px] normal-case tracking-normal",
               withinBudget
                 ? "bg-accent-fade text-ink"
                 : "bg-negative/10 text-negative"
@@ -121,7 +114,7 @@ export function PopupActive() {
             {withinBudget ? "Within budget" : "Over budget line"}
           </span>
         </div>
-        <div className="mt-2 font-mono text-[20px] font-medium tabular-nums text-ink">
+        <div className="mt-2 break-words font-mono text-[20px] font-medium tabular-nums text-ink">
           {formatCurrency(remaining)}{" "}
           <span className="text-[12px] font-normal text-ink-3">
             left of {formatCurrency(config.budgetAmount)}
@@ -140,9 +133,9 @@ export function PopupActive() {
 
       {/* Cooling-off */}
       {pending.length > 0 && nextCoolingDeadline ? (
-        <section className="flex items-start gap-2 rounded-xl border border-ink-4 bg-surface px-3 py-2.5 text-[12px]">
+        <section className="flex min-w-0 items-start gap-2 rounded-xl border border-ink-4 bg-surface px-3 py-2.5 text-[12px]">
           <Clock className="mt-0.5 size-4 shrink-0 text-ink-3" aria-hidden />
-          <div>
+          <div className="min-w-0">
             <div className="font-medium text-ink">
               Cooling off · {pending.length} item
               {pending.length === 1 ? "" : "s"}
@@ -200,7 +193,7 @@ export function PopupActive() {
         </p>
         <div className="flex flex-col gap-1.5">
           <a
-            href={dashboardUrl}
+            {...extensionFullPageLinkProps("dashboard.html")}
             className={cn(
               buttonVariants({ variant: "default" }),
               "no-underline w-full justify-center gap-2 bg-ink text-[13px] text-paper hover:bg-ink/90"
@@ -210,7 +203,7 @@ export function PopupActive() {
             Open full dashboard
           </a>
           <a
-            href={shopUrl}
+            {...extensionFullPageLinkProps("shop.html")}
             className={cn(
               buttonVariants({ variant: "outline" }),
               "no-underline w-full justify-center gap-2 border-ink-4 text-[13px]"
@@ -220,7 +213,7 @@ export function PopupActive() {
             Demo shop
           </a>
           <a
-            href={cartUrl}
+            {...extensionFullPageLinkProps("cart.html")}
             className={cn(
               buttonVariants({ variant: "outline" }),
               "no-underline w-full justify-center gap-2 border-ink-4 text-[13px]"
@@ -230,7 +223,7 @@ export function PopupActive() {
             Cart{cartQty > 0 ? ` (${cartQty})` : ""}
           </a>
           <a
-            href={wishlistUrl}
+            {...extensionFullPageLinkProps("wishlist.html")}
             className={cn(
               buttonVariants({ variant: "outline" }),
               "no-underline w-full justify-center gap-2 border-ink-4 text-[13px]"
@@ -240,7 +233,7 @@ export function PopupActive() {
             Wishlist{wishlistQty > 0 ? ` (${wishlistQty})` : ""}
           </a>
           <a
-            href={settingsUrl}
+            {...extensionFullPageLinkProps("settings.html")}
             className={cn(
               buttonVariants({ variant: "outline" }),
               "no-underline w-full justify-center gap-2 border-ink-4 text-[13px]"
@@ -250,7 +243,7 @@ export function PopupActive() {
             Settings &amp; onboarding
           </a>
           <a
-            href={setupIntroUrl}
+            {...extensionFullPageLinkProps("setup.html?intro=1")}
             className={cn(
               buttonVariants({ variant: "ghost" }),
               "no-underline w-full justify-center text-[12px] text-ink-3 hover:text-ink"

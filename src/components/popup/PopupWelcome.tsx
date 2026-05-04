@@ -4,13 +4,11 @@ import { Leaf } from "lucide-react";
 import { HintTooltip } from "@/components/ui/hint-tooltip";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { getExtensionPageUrl } from "@/lib/extension-url";
+import { extensionFullPageLinkProps } from "@/lib/extension-url";
 
 export function PopupWelcome() {
-  const setupUrl = getExtensionPageUrl("setup.html");
-
   return (
-    <div className="box-border w-full max-w-full space-y-4 px-3 py-4 text-ink">
+    <div className="box-border w-full min-w-0 max-w-full space-y-4 px-3 py-4 text-ink">
       <div className="flex items-start gap-2">
         <Leaf
           className="mt-0.5 size-5 shrink-0 text-accent"
@@ -70,7 +68,7 @@ export function PopupWelcome() {
       </p>
 
       <a
-        href={setupUrl}
+        {...extensionFullPageLinkProps("setup.html")}
         className={cn(
           buttonVariants({ variant: "default" }),
           "no-underline inline-flex w-full justify-center bg-ink text-paper hover:bg-ink/90"
