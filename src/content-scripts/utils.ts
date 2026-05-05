@@ -1,6 +1,12 @@
 // Shared utilities for content scripts
 
-import { AppState, FrictionLevel, STORAGE_KEY, WishlistItem } from "@/lib/types";
+import {
+  AppState,
+  FrictionLevel,
+  STORAGE_KEY,
+  WishlistItem,
+  normalizeAppState,
+} from "@/lib/types";
 
 export interface ProductData {
   name: string;
@@ -78,7 +84,7 @@ export async function loadExtensionState(): Promise<AppState | null> {
     const data = await chrome.storage.local.get(STORAGE_KEY);
     const state = data[STORAGE_KEY] as AppState | undefined;
     if (!state || state.schemaVersion !== 1) return null;
-    return state;
+    return normalizeAppState(state);
   } catch {
     return null;
   }

@@ -30,6 +30,34 @@ const reflectionQuestions = [
 
 const reasonOptions = ['Need', 'Want', 'Replacement', 'Gift', 'Stress/Boredom', 'Not sure'];
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+function sendMessage<T>(message: unknown): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const runtime = (globalThis as any).chrome?.runtime;
+    if (!runtime?.sendMessage) {
+      reject(new Error('chrome.runtime.sendMessage unavailable'));
+      return;
+    }
+
+    runtime.sendMessage(message, (response: T) => {
+      const lastError = (globalThis as any).chrome?.runtime?.lastError;
+      if (lastError) {
+        reject(new Error(lastError.message));
+        return;
+      }
+      resolve(response);
+    });
+  });
+}
+
+function dashboardUrl(): string {
+  const runtime = (globalThis as any).chrome?.runtime;
+  return runtime?.getURL ? runtime.getURL('dashboard.html') : '/dashboard';
+}
+
 const styles = `
 :root {
   --pause-primary: #0f766e;
@@ -202,6 +230,32 @@ const styles = `
   margin-top: 24px;
 }
 
+.pause-saving-log {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 14px;
+  font-size: 13px;
+  color: var(--pause-text);
+}
+
+.pause-saving-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fff;
+  border: 1px solid var(--pause-border);
+}
+
+.pause-saving-line.done {
+  border-color: var(--pause-primary);
+  color: var(--pause-primary);
+  font-weight: 700;
+}
+
 .pause-btn {
   display: inline-flex;
   align-items: center;
@@ -221,6 +275,12 @@ const styles = `
   color: #fff;
 }
 
+.pause-btn-hero {
+  padding: 16px 18px;
+  font-size: 16px;
+  box-shadow: 0 10px 20px rgba(15, 118, 110, 0.18);
+}
+
 .pause-btn-primary:hover:not(:disabled) {
   filter: brightness(1.05);
 }
@@ -234,6 +294,12 @@ const styles = `
   background: #fff;
   border: 1px solid var(--pause-border);
   color: var(--pause-text);
+}
+
+.pause-btn-quiet {
+  padding: 10px 14px;
+  font-size: 13px;
+  opacity: 0.92;
 }
 
 .pause-btn-secondary:hover {
@@ -286,9 +352,76 @@ export async function mountAmazonInterventionSteps(
   const config = frictionConfigs[friction];
   const modal = document.createElement('div');
   modal.setAttribute('data-pause-intervention', 'true');
+  let currentStep: InterventionStep = 'pause';
+  let userResponses = {
+    reflectionAnswered: false,
+    reasonSelected: '',
+  };
+  let isSaving = false;
+  let saveLines: string[] = [];
+  let savedCount = 0;
+
+  async function handleSaveForLater() {
+    if (isSaving) return;
+    isSaving = true;
+    savedCount = 0;
+
+    saveLines = ['Saving items to your Pause wishlist...'];
+
+    for (let index = 0; index < cartData.items.length; index += 1) {
+      savedCount = index + 1;
+      saveLines = [...saveLines, `Saved ${index + 1} of ${cartData.items.length}`];
+      renderStep();
+      await sleep(180);
+    }
+
+    if (cartData.items.length === 0) {
+      saveLines = [...saveLines, 'Saved 0 of 0'];
+    }
+
+    saveLines = [...saveLines, 'Done'];
+    renderStep();
+  await sleep(250);
+
+    const payload = {
+      id: `amazon-pause-${Date.now()}`,
+      sourceSite: 'amazon' as const,
+      sourceUrl: window.location.href,
+      pausedAt: Date.now(),
+      cartSubtotal: cartData.subtotal,
+      itemCount: cartData.itemCount,
+      amountAvoided: cartData.subtotal ?? 0,
+      currency: cartData.currency,
+      items: cartData.items.map((item, index) => ({
+        id: `${Date.now()}-${index}-${item.name.slice(0, 12).replace(/\s+/g, '-')}`,
+        name: item.name,
+        price: item.price,
+        quantity: item.quantity,
+        productUrl: item.productUrl,
+        imageUrl: item.imageUrl,
+        pausedAt: Date.now(),
+        sourceSite: 'amazon' as const,
+      })),
+    };
+
+    try {
+      const response = await sendMessage<{ ok: boolean; error?: string }>({
+        action: 'saveAmazonPauseCart',
+        payload,
+      });
+
+      if (!response?.ok) {
+        throw new Error(response?.error || 'Failed to save Amazon pause session');
+      }
+    } catch (err) {
+      console.warn('[Pause] could not save pause session through extension', err);
+      window.location.assign(dashboardUrl());
+    }
+  }
+
   modal.addEventListener('click', (event) => {
     const target = event.target as HTMLElement | null;
-    if (!target) {
+    if (!target || isSaving) {
       return;
     }
 
@@ -299,6 +432,16 @@ export async function mountAmazonInterventionSteps(
 
     const action = actionButton.dataset.pauseAction;
     const reason = actionButton.dataset.reason;
+
+    if (action === 'back') {
+      const steps: InterventionStep[] = ['pause', 'timer', 'reflection', 'impact', 'decision'];
+      const idx = steps.indexOf(currentStep);
+      if (idx > 0) {
+        currentStep = steps[idx - 1];
+        renderStep();
+      }
+      return;
+    }
 
     if (action === 'next') {
       const steps: InterventionStep[] = ['pause', 'timer', 'reflection', 'impact', 'decision'];
@@ -327,9 +470,7 @@ export async function mountAmazonInterventionSteps(
     }
 
     if (action === 'save-for-later') {
-      console.log('[Pause] User chose to save for later', userResponses);
-      modal.remove();
-      // TODO: Implement save to wishlist / dashboard redirect
+      void handleSaveForLater();
       return;
     }
 
@@ -342,14 +483,9 @@ export async function mountAmazonInterventionSteps(
         console.warn('[Pause] could not open dashboard', err);
         window.location.href = '/dashboard';
       }
+      return;
     }
   });
-  
-  let currentStep: InterventionStep = 'pause';
-  let userResponses = {
-    reflectionAnswered: false,
-    reasonSelected: '',
-  };
 
   // Inject styles
   if (!document.querySelector('style[data-pause-multi-steps]')) {
@@ -360,6 +496,28 @@ export async function mountAmazonInterventionSteps(
   }
 
   function renderStep() {
+    if (isSaving) {
+      modal.innerHTML = `
+        <div class="pause-intervention-modal">
+          <div class="pause-panel">
+            <p class="pause-eyebrow">Saving pause</p>
+            <h1 class="pause-title">Saving items to your Pause wishlist...</h1>
+            <p class="pause-description">Please hold while we store this cart in your extension dashboard.</p>
+            <div class="pause-card">
+              <div class="pause-card-row">
+                <span class="pause-card-label">Progress</span>
+                <span class="pause-card-value">${savedCount} of ${cartData.items.length}</span>
+              </div>
+            </div>
+            <div class="pause-saving-log">
+              ${saveLines.map((line) => `<div class="pause-saving-line ${line === 'Done' ? 'done' : ''}">${line}</div>`).join('')}
+            </div>
+          </div>
+        </div>
+      `;
+      return;
+    }
+
     let html = '';
     const stepIndex = ['pause', 'timer', 'reflection', 'impact', 'decision'].indexOf(currentStep);
     const totalSteps = 5;
@@ -400,7 +558,7 @@ export async function mountAmazonInterventionSteps(
           ` : ''}
         </div>
 
-        <button class="pause-btn pause-btn-primary" data-pause-action="next">
+        <button class="pause-btn pause-btn-primary pause-btn-hero" data-pause-action="next">
           Take a pause
         </button>
       `;
@@ -419,7 +577,7 @@ export async function mountAmazonInterventionSteps(
           </div>
         </div>
 
-        <button class="pause-btn pause-btn-primary" id="pause-timer-btn" data-pause-action="next" disabled>
+        <button class="pause-btn pause-btn-primary pause-btn-quiet" id="pause-timer-btn" data-pause-action="next" disabled>
           Continue (wait...)
         </button>
       `;
@@ -467,7 +625,7 @@ export async function mountAmazonInterventionSteps(
           </div>
         </div>
 
-        <button class="pause-btn pause-btn-primary" data-pause-action="next">
+        <button class="pause-btn pause-btn-primary pause-btn-hero" data-pause-action="next">
           I've thought it through
         </button>
       `;
@@ -509,7 +667,7 @@ export async function mountAmazonInterventionSteps(
           Saving this for later keeps you closer to your plan.
         </p>
 
-        <button class="pause-btn pause-btn-primary" data-pause-action="next">
+        <button class="pause-btn pause-btn-primary pause-btn-hero" data-pause-action="next">
           Ready to decide
         </button>
       `;
@@ -519,14 +677,17 @@ export async function mountAmazonInterventionSteps(
         <h1 class="pause-title">Your call.</h1>
         
         <div class="pause-actions">
-          <button class="pause-btn pause-btn-primary" data-pause-action="checkout">
+          <button class="pause-btn pause-btn-secondary pause-btn-quiet" data-pause-action="checkout">
             Continue to checkout
           </button>
-          <button class="pause-btn pause-btn-secondary" data-pause-action="save-for-later">
+          <button class="pause-btn pause-btn-primary pause-btn-hero" data-pause-action="save-for-later">
             Wait / Save for later
           </button>
-          <button class="pause-btn pause-btn-secondary" data-pause-action="review-plan">
+          <button class="pause-btn pause-btn-secondary pause-btn-quiet" data-pause-action="review-plan">
             Review my spending plan
+          </button>
+          <button class="pause-btn pause-btn-secondary pause-btn-quiet" data-pause-action="back">
+            Back
           </button>
         </div>
       `;

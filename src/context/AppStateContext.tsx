@@ -17,6 +17,7 @@ import {
   Necessity,
   PurchaseRecord,
   STORAGE_KEY,
+  normalizeAppState,
   UserConfig,
   WishlistItem,
 } from "@/lib/types";
@@ -96,7 +97,7 @@ export function AppStateProvider({
         const data = await chrome.storage.local.get(STORAGE_KEY);
         const extensionState = data[STORAGE_KEY] as AppState | undefined;
         if (!cancelled && extensionState?.schemaVersion === 1) {
-          setState(extensionState);
+          setState(normalizeAppState(extensionState));
         }
       } catch {
         // Ignore storage sync failures outside the extension runtime.

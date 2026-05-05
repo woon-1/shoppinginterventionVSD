@@ -7,7 +7,9 @@ import {
   DEFAULT_STATE,
   FrictionLevel,
   STORAGE_KEY,
+  normalizeAppState,
   WishlistItem,
+  AmazonPauseSession,
 } from "@/lib/types";
 import {
   CART_INTERVENTION_STATS_KEY,
@@ -36,25 +38,27 @@ interface AddToWishlistRequest {
   website: WishlistItem["website"];
 }
 
+interface SaveAmazonPauseCartRequest {
+  action: "saveAmazonPauseCart";
+  payload: AmazonPauseSession;
+}
+
 interface AddToWishlistResponse {
   success: boolean;
   error?: string;
   item?: WishlistItem;
 }
 
+interface SaveAmazonPauseCartResponse {
+  ok: boolean;
+  error?: string;
+}
+
 async function getStoredState(): Promise<AppState> {
   const data = await chrome.storage.local.get(STORAGE_KEY);
   const storedState = data[STORAGE_KEY] as AppState | undefined;
 
-  if (!storedState || storedState.schemaVersion !== 1) {
-    return DEFAULT_STATE;
-  }
-
-  return {
-    ...DEFAULT_STATE,
-    ...storedState,
-    wishlist: storedState.wishlist ?? [],
-  };
+  return normalizeAppState(storedState ?? DEFAULT_STATE);
 }
 
 async function saveStoredState(state: AppState): Promise<void> {
@@ -74,9 +78,9 @@ chrome.runtime.onInstalled.addListener((details) => {
 
 chrome.runtime.onMessage.addListener(
   (
-    request: AddToWishlistRequest | RecordCartInterventionRequest,
+    request: AddToWishlistRequest | RecordCartInterventionRequest | SaveAmazonPauseCartRequest,
     sender: chrome.runtime.MessageSender,
-    sendResponse: (response: AddToWishlistResponse | { ok: boolean }) => void
+    sendResponse: (response: AddToWishlistResponse | SaveAmazonPauseCartResponse | { ok: boolean }) => void
   ) => {
     if (request.action === "addToWishlist") {
       void handleAddToWishlist(request, sender, sendResponse);
@@ -85,6 +89,10 @@ chrome.runtime.onMessage.addListener(
     if (request.action === "recordCartIntervention") {
       void appendCartInterventionEvent(request.payload, sender.tab?.id);
       sendResponse({ ok: true });
+      return true;
+    }
+    if (request.action === "saveAmazonPauseCart") {
+      void handleSaveAmazonPauseCart(request, sender, sendResponse);
       return true;
     }
   }
@@ -163,6 +171,43 @@ async function handleAddToWishlist(
     console.error("[Pause] Error adding to wishlist:", error);
     sendResponse({
       success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
+}
+
+async function handleSaveAmazonPauseCart(
+  request: SaveAmazonPauseCartRequest,
+  sender: chrome.runtime.MessageSender,
+  sendResponse: (response: SaveAmazonPauseCartResponse) => void
+) {
+  try {
+    const state = await getStoredState();
+    const nextSession: AmazonPauseSession = {
+      ...request.payload,
+      id: request.payload.id || `amazon-pause-${Date.now()}`,
+    };
+
+    state.amazonPauseSessions = [...(state.amazonPauseSessions ?? []), nextSession].slice(-20);
+    await saveStoredState(state);
+
+    const dashboardUrl = chrome.runtime.getURL("dashboard.html");
+    const tabId = sender.tab?.id;
+    try {
+      if (typeof tabId === "number") {
+        await chrome.tabs.update(tabId, { url: dashboardUrl });
+      } else {
+        await chrome.tabs.create({ url: dashboardUrl, active: true });
+      }
+    } catch {
+      await chrome.tabs.create({ url: dashboardUrl, active: true });
+    }
+
+    sendResponse({ ok: true });
+  } catch (error) {
+    console.error("[Pause] Error saving Amazon pause session:", error);
+    sendResponse({
+      ok: false,
       error: error instanceof Error ? error.message : "Unknown error",
     });
   }

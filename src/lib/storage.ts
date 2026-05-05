@@ -1,16 +1,15 @@
-import { AppState, DEFAULT_STATE, STORAGE_KEY } from "./types";
+import { AppState, STORAGE_KEY, normalizeAppState } from "./types";
 import { clearSetupIntro } from "./setup-intro";
 
 export function loadState(): AppState {
-  if (typeof window === "undefined") return DEFAULT_STATE;
+  if (typeof window === "undefined") return normalizeAppState(null);
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return DEFAULT_STATE;
+    if (!raw) return normalizeAppState(null);
     const parsed = JSON.parse(raw) as AppState;
-    if (!parsed || parsed.schemaVersion !== 1) return DEFAULT_STATE;
-    return parsed;
+    return normalizeAppState(parsed);
   } catch {
-    return DEFAULT_STATE;
+    return normalizeAppState(null);
   }
 }
 

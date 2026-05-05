@@ -6,7 +6,13 @@
 export interface AmazonCartData {
   subtotal: number | null;
   itemCount: number;
-  items: Array<{ name: string; price: number | null }>;
+  items: Array<{
+    name: string;
+    price: number | null;
+    quantity: number;
+    productUrl: string | null;
+    imageUrl: string | null;
+  }>;
   currency: string;
 }
 
@@ -25,6 +31,33 @@ function parsePrice(str: string): number | null {
   const num = match[0].replace(/,/g, '');
   const parsed = parseFloat(num);
   return isFinite(parsed) ? parsed : null;
+}
+
+function parseQuantity(container: Element): number {
+  const directCandidates = [
+    container.querySelector('input[name*="quantity"]'),
+    container.querySelector('select[name*="quantity"]'),
+    container.querySelector('[data-quantity]'),
+    container.querySelector('[class*="quantity"]'),
+  ];
+
+  for (const candidate of directCandidates) {
+    if (!candidate) continue;
+    const value = candidate instanceof HTMLInputElement || candidate instanceof HTMLSelectElement
+      ? candidate.value
+      : candidate.textContent || candidate.getAttribute('data-quantity') || '';
+    const parsed = parseInt(value.match(/\d+/)?.[0] || '', 10);
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  }
+
+  const text = container.textContent || '';
+  const match = text.match(/(?:qty|quantity)[:\s]+(\d+)/i);
+  if (match) {
+    const parsed = parseInt(match[1], 10);
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  }
+
+  return 1;
 }
 
 export function extractAmazonCartData(): AmazonCartData {
@@ -81,7 +114,7 @@ export function extractAmazonCartData(): AmazonCartData {
     for (const container of itemContainers) {
       try {
         // Item name
-        const nameEl = container.querySelector('h4, .a-size-base, [class*="title"]');
+        const nameEl = container.querySelector('h4, h3, .a-size-base, [class*="title"], a[href]');
         const name = (nameEl?.textContent || '').trim().slice(0, 100);
         if (!name) continue;
 
@@ -92,10 +125,22 @@ export function extractAmazonCartData(): AmazonCartData {
           price = parsePrice(priceEl.textContent || '');
         }
 
-        result.items.push({ name, price });
+        const linkEl = container.querySelector('a[href*="/dp/"], a[href*="/gp/product/"], a[href*="/gp/cart/"]') as HTMLAnchorElement | null;
+        const productUrl = linkEl?.href || null;
+
+        const imageEl = container.querySelector('img') as HTMLImageElement | null;
+        const imageUrl = imageEl?.src || imageEl?.getAttribute('data-src') || imageEl?.getAttribute('data-old-hires') || null;
+
+        const quantity = parseQuantity(container);
+
+        result.items.push({ name, price, quantity, productUrl, imageUrl });
       } catch (itemErr) {
         console.warn('[Pause] item extraction error', itemErr);
       }
+    }
+
+    if (result.items.length > 0) {
+      result.itemCount = result.items.reduce((sum, item) => sum + Math.max(1, item.quantity || 1), 0);
     }
   } catch (e) {
     console.warn('[Pause] items list extraction error', e);
