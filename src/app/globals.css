@@ -166,3 +166,71 @@
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.01em;
 }
+
+/* Sonner uses a fixed layer with a very high z-index; keep the tray from
+   intercepting clicks when there are no toasts (empty overlay bug). */
+[data-sonner-toaster] {
+  pointer-events: none;
+}
+[data-sonner-toaster] [data-sonner-toast],
+[data-sonner-toaster] li {
+  pointer-events: auto;
+}
+
+/* ─── chrome.browserAction default_popup (popup.html only) ───
+   Fixed viewport so the popup panel is not sized as a thin column.
+   !important beats Tailwind utilities on html/body that fight fixed sizing. */
+html:has(.extension-popup-shell),
+html:has(.extension-popup-shell) body {
+  width: 360px !important;
+  min-width: 360px !important;
+  max-width: 360px !important;
+  height: 520px !important;
+  min-height: 520px !important;
+  max-height: 520px !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+}
+
+html:has(.extension-popup-shell) body {
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+html:has(.extension-popup-shell) body > * {
+  min-width: 0 !important;
+  min-height: 0 !important;
+}
+
+.extension-popup-shell {
+  box-sizing: border-box !important;
+  width: 360px !important;
+  min-width: 360px !important;
+  max-width: 360px !important;
+  flex: 1 1 auto !important;
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+  align-self: stretch !important;
+  background-color: var(--paper);
+}
+
+.extension-popup-scroll {
+  box-sizing: border-box !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Every popup route subtree fills the scroll port (loading / welcome / active). */
+.extension-popup-scroll > .extension-popup-panel {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+}

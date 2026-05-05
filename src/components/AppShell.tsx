@@ -10,16 +10,23 @@ import { cn } from "@/lib/utils";
 const NAV = [
   { href: "/shop", label: "Shop" },
   { href: "/cart", label: "Cart" },
+  { href: "/wishlist", label: "Wishlist" },
   { href: "/dashboard", label: "Dashboard" },
   { href: "/settings", label: "Settings" },
 ];
 
-const HIDDEN_PATHS = new Set(["/", "/setup"]);
+const HIDDEN_PATHS = new Set(["/", "/setup", "/popup", "/popup.html"]);
+
+function normalizePathname(pathname: string | null | undefined) {
+  if (!pathname) return "";
+  return pathname.replace(/\.html$/, "").replace(/\/$/, "") || "/";
+}
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const normalizedPathname = normalizePathname(pathname);
   const { state, hydrated } = useAppState();
-  const hidden = HIDDEN_PATHS.has(pathname);
+  const hidden = HIDDEN_PATHS.has(normalizedPathname);
 
   if (hidden) return <>{children}</>;
 
@@ -29,6 +36,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       ? remainingBudget(state.config, state.purchases)
       : null;
   const cartCount = state.cart.reduce((sum, l) => sum + l.qty, 0);
+  const wishlistCount = state.wishlist.length;
   const spent =
     remaining !== null && budgetAmount > 0 ? budgetAmount - remaining : 0;
   const spentPct =
@@ -66,6 +74,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   {n.href === "/cart" && cartCount > 0 && (
                     <span className="ml-1 inline-flex h-4 min-w-4 items-center justify-center rounded-sm bg-ink px-1 font-mono text-[10px] font-medium text-paper num-tabular">
                       {cartCount}
+                    </span>
+                  )}
+                  {n.href === "/wishlist" && wishlistCount > 0 && (
+                    <span className="ml-1 inline-flex h-4 min-w-4 items-center justify-center rounded-sm bg-accent px-1 font-mono text-[10px] font-medium text-paper num-tabular">
+                      {wishlistCount}
                     </span>
                   )}
                 </Link>

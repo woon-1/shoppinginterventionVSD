@@ -16,7 +16,10 @@ import {
   DEFAULT_STATE,
   Necessity,
   PurchaseRecord,
+  STORAGE_KEY,
+  normalizeAppState,
   UserConfig,
+  WishlistItem,
 } from "@/lib/types";
 import { loadState, saveState, wipeState } from "@/lib/storage";
 import { getCatalogItem } from "@/lib/catalog";
@@ -53,6 +56,10 @@ interface AppStateContextValue {
   cancelCoolingOffEntry: (entryId: string) => void;
   resolveExpiredCoolingOff: () => void;
   fastForwardCoolingOff: () => void;
+  addToWishlist: (item: WishlistItem) => void;
+  removeFromWishlist: (id: string) => void;
+  getWishlistByWebsite: (website: WishlistItem["website"]) => WishlistItem[];
+  clearWishlist: () => void;
   wipe: () => void;
 }
 
@@ -63,21 +70,54 @@ export function AppStateProvider({
 }: {
   children: React.ReactNode;
 }) {
-  const [state, setState] = useState<AppState>(DEFAULT_STATE);
-  const [hydrated, setHydrated] = useState(false);
+  const [state, setState] = useState<AppState>(() => {
+    if (typeof window === "undefined") return DEFAULT_STATE;
+    return loadState();
+  });
+  // Client: ready on first paint so extension UI is not stuck behind an effect tick.
+  const [hydrated, setHydrated] = useState(
+    () => typeof window !== "undefined"
+  );
   const stateRef = useRef(state);
   stateRef.current = state;
 
-  // Hydrate from localStorage on first mount only
+  // Re-read storage after mount; merge Chrome extension storage when present.
   useEffect(() => {
     const loaded = loadState();
     setState(loaded);
-    setHydrated(true);
+    if (typeof window !== "undefined") {
+      setHydrated(true);
+    }
+
+    let cancelled = false;
+
+    const syncFromChromeStorage = async () => {
+      if (typeof chrome === "undefined" || !chrome.storage?.local) return;
+      try {
+        const data = await chrome.storage.local.get(STORAGE_KEY);
+        const extensionState = data[STORAGE_KEY] as AppState | undefined;
+        if (!cancelled && extensionState?.schemaVersion === 1) {
+          setState(normalizeAppState(extensionState));
+        }
+      } catch {
+        // Ignore storage sync failures outside the extension runtime.
+      }
+    };
+
+    void syncFromChromeStorage();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  // Persist on every change after hydration
+  // Persist to both localStorage and extension storage after hydration.
   useEffect(() => {
-    if (hydrated) saveState(state);
+    if (!hydrated) return;
+    saveState(state);
+    if (typeof chrome !== "undefined" && chrome.storage?.local) {
+      void chrome.storage.local.set({ [STORAGE_KEY]: state });
+    }
   }, [state, hydrated]);
 
   const setConfig = useCallback((config: UserConfig) => {
@@ -265,8 +305,39 @@ export function AppStateProvider({
     // resolveExpiredCoolingOff will be called by the ticker on next tick
   }, []);
 
+  const addToWishlist = useCallback((item: WishlistItem) => {
+    setState((s) => ({
+      ...s,
+      wishlist: [...s.wishlist, item],
+    }));
+  }, []);
+
+  const removeFromWishlist = useCallback((id: string) => {
+    setState((s) => ({
+      ...s,
+      wishlist: s.wishlist.filter((w) => w.id !== id),
+    }));
+  }, []);
+
+  const getWishlistByWebsite = useCallback(
+    (website: WishlistItem["website"]) => {
+      return stateRef.current.wishlist.filter((w) => w.website === website);
+    },
+    []
+  );
+
+  const clearWishlist = useCallback(() => {
+    setState((s) => ({
+      ...s,
+      wishlist: [],
+    }));
+  }, []);
+
   const wipe = useCallback(() => {
     wipeState();
+    if (typeof chrome !== "undefined" && chrome.storage?.local) {
+      void chrome.storage.local.remove(STORAGE_KEY);
+    }
     setState(DEFAULT_STATE);
   }, []);
 
@@ -286,6 +357,10 @@ export function AppStateProvider({
       cancelCoolingOffEntry,
       resolveExpiredCoolingOff,
       fastForwardCoolingOff,
+      addToWishlist,
+      removeFromWishlist,
+      getWishlistByWebsite,
+      clearWishlist,
       wipe,
     }),
     [
@@ -303,6 +378,10 @@ export function AppStateProvider({
       cancelCoolingOffEntry,
       resolveExpiredCoolingOff,
       fastForwardCoolingOff,
+      addToWishlist,
+      removeFromWishlist,
+      getWishlistByWebsite,
+      clearWishlist,
       wipe,
     ]
   );

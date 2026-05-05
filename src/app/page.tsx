@@ -3,6 +3,7 @@
 import { Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAppState } from "@/context/AppStateContext";
+import { extensionAwareReplace } from "@/lib/extension-nav";
 
 function Gate() {
   const router = useRouter();
@@ -13,13 +14,13 @@ function Gate() {
     if (!hydrated) return;
     if (search.get("reset") === "1") {
       wipe();
-      router.replace("/setup");
+      extensionAwareReplace(router, "/setup");
       return;
     }
     if (state.config?.onboardingComplete) {
-      router.replace("/shop");
+      extensionAwareReplace(router, "/shop");
     } else {
-      router.replace("/setup");
+      extensionAwareReplace(router, "/setup");
     }
   }, [hydrated, state.config, search, router, wipe]);
 

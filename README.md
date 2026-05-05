@@ -31,6 +31,16 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000). On a fresh browser you will land on the onboarding wizard.
 
+## Chrome extension
+
+This repo now also exports a Chrome extension surface. After building with `npm run build`, load the generated `out/` folder in `chrome://extensions` with Developer mode enabled. The extension icon opens the full-page onboarding view first, then the compact extension surface after setup is complete. The build rewrites Next export assets out of Chrome-reserved underscore-prefixed names, copies the extension manifest to the build root, and exposes the compact UI at `popup.html`.
+
+The extension package now has two entry points: the full-page setup flow and the compact popup-style surface. It reuses the same local state and navigation as the web app, and the shopping-site content scripts inject the wishlist button plus a reflective prompt on supported product pages.
+
+## Extension preview
+
+If you want to see an example of the injected UI on a product page, open [http://localhost:3000/preview](http://localhost:3000/preview) in the local app or [preview.html](out/preview.html) in the exported build. That page shows a mock e-commerce product detail view with the Pause "Add to Wishlist" button in the purchase area.
+
 ## User-testing notes
 
 - **Demo mode** is on by default. While demo mode is on, the cooling-off period is shortened to ~60 seconds so a tester can see the savings flow within a single session. A "DEMO MODE" badge appears in the header.

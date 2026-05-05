@@ -34,6 +34,13 @@ export interface CatalogItem {
   emoji: string;
 }
 
+/** Optional VSD hooks for future personalization (friction tone, reminders). */
+export interface InterventionPreferences {
+  /** Display label for goal type, e.g. travel, emergency fund. */
+  goalTypeLabel?: string;
+  reminderFrequency?: "low" | "standard" | "high";
+}
+
 export interface UserConfig {
   budgetAmount: number;
   budgetPeriod: Period;
@@ -44,6 +51,7 @@ export interface UserConfig {
   demoMode: boolean;
   createdAt: number;
   onboardingComplete: boolean;
+  interventionPreferences?: InterventionPreferences;
 }
 
 export interface CartLine {
@@ -84,12 +92,48 @@ export interface SavingsLedger {
   byDay: Record<string, number>;
 }
 
+export interface WishlistItem {
+  id: string;
+  name: string;
+  price: number;
+  currency: string;
+  website: "amazon" | "ebay" | "etsy" | "target" | "walmart";
+  url: string;
+  imageUrl?: string;
+  addedAt: number;
+}
+
+export interface AmazonPauseItem {
+  id: string;
+  name: string;
+  price: number | null;
+  quantity: number;
+  productUrl: string | null;
+  imageUrl: string | null;
+  pausedAt: number;
+  sourceSite: "amazon";
+}
+
+export interface AmazonPauseSession {
+  id: string;
+  sourceSite: "amazon";
+  sourceUrl: string;
+  pausedAt: number;
+  cartSubtotal: number | null;
+  itemCount: number;
+  amountAvoided: number;
+  currency: string;
+  items: AmazonPauseItem[];
+}
+
 export interface AppState {
   config: UserConfig | null;
   cart: CartLine[];
   coolingOff: CoolingOffEntry[];
   purchases: PurchaseRecord[];
   savings: SavingsLedger;
+  wishlist: WishlistItem[];
+  amazonPauseSessions: AmazonPauseSession[];
   schemaVersion: 1;
 }
 
@@ -104,7 +148,26 @@ export const DEFAULT_STATE: AppState = {
     longestSkipStreak: 0,
     byDay: {},
   },
+  wishlist: [],
+  amazonPauseSessions: [],
   schemaVersion: 1,
 };
+
+export function normalizeAppState(state: Partial<AppState> | null | undefined): AppState {
+  if (!state || state.schemaVersion !== 1) return DEFAULT_STATE;
+  return {
+    ...DEFAULT_STATE,
+    ...state,
+    cart: state.cart ?? DEFAULT_STATE.cart,
+    coolingOff: state.coolingOff ?? DEFAULT_STATE.coolingOff,
+    purchases: state.purchases ?? DEFAULT_STATE.purchases,
+    savings: {
+      ...DEFAULT_STATE.savings,
+      ...(state.savings ?? {}),
+    },
+    wishlist: state.wishlist ?? DEFAULT_STATE.wishlist,
+    amazonPauseSessions: state.amazonPauseSessions ?? DEFAULT_STATE.amazonPauseSessions,
+  };
+}
 
 export const STORAGE_KEY = "shoppingintervention.v1";

@@ -12,7 +12,7 @@ import {
 } from "@/lib/intervention";
 import { remainingBudget, periodLabel } from "@/lib/budget";
 import { formatCurrency } from "@/lib/format";
-import { Necessity } from "@/lib/types";
+import { FrictionLevel, Necessity } from "@/lib/types";
 import { unsplashUrl } from "@/lib/catalog";
 import {
   Dialog,
@@ -23,6 +23,13 @@ import { Button } from "@/components/ui/button";
 import { LightPause } from "./LightPause";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { extensionAwareReplace } from "@/lib/extension-nav";
+import {
+  deriveAdaptiveIntervention,
+  loadStoredCartInterventionStats,
+  type AdaptiveIntervention,
+  type CartInterventionPayload,
+} from "@/lib/intervention-behavior";
 
 interface Props {
   open: boolean;
@@ -41,11 +48,14 @@ export function InterventionModal({ open, onOpenChange }: Props) {
     useAppState();
   const [necessity, setNecessity] = useState<Necessity>("want");
   const [showAlternatives, setShowAlternatives] = useState(false);
+  const [justification, setJustification] = useState("");
+  const [adaptive, setAdaptive] = useState<AdaptiveIntervention | null>(null);
 
   useEffect(() => {
     if (open) {
       setNecessity("want");
       setShowAlternatives(false);
+      setJustification("");
     }
   }, [open]);
 
@@ -68,20 +78,71 @@ export function InterventionModal({ open, onOpenChange }: Props) {
     [breakdown, config, remaining]
   );
 
+  useEffect(() => {
+    if (!open || !state.config || !breakdown) {
+      setAdaptive(null);
+      return;
+    }
+
+    const configFriction = state.config.friction;
+    const cartTotal = breakdown.total;
+
+    let active = true;
+    void loadStoredCartInterventionStats().then((stats) => {
+      if (!active) return;
+      setAdaptive(deriveAdaptiveIntervention(configFriction, stats, cartTotal));
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [open, state.config, breakdown]);
+
   if (!open || !config || !breakdown || !decision) return null;
 
-  if (decision.level === "light") {
+  const baseFriction: FrictionLevel =
+    decision.level === "none" ? config.friction : decision.level;
+  const effectiveFriction = adaptive?.friction ?? baseFriction;
+  const pauseSeconds = Math.max(
+    1.5,
+    (adaptive?.pauseMs ?? (decision.level === "strict" ? 4200 : 1600)) / 1000
+  );
+  const requiresJustification =
+    adaptive?.requireJustification ?? decision.level === "strict";
+  const tone =
+    adaptive?.headlineTone ??
+    (decision.level === "light"
+      ? "gentle"
+      : decision.level === "strict"
+        ? "firm"
+        : "direct");
+  const canProceed = !requiresJustification || justification.trim().length > 0;
+
+  if (effectiveFriction === "light") {
     return (
       <LightPause
         open={open}
         onOpenChange={onOpenChange}
+        pauseSeconds={pauseSeconds}
         onComplete={() => {
           purchaseCart(state.cart, { [necessity]: 1 }, false);
           toast.success("Purchase complete", {
             description: `${formatCurrency(breakdown.total)} charged.`,
           });
+          if (typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
+            void chrome.runtime.sendMessage({
+              action: "recordCartIntervention",
+              payload: {
+                kind: "continue",
+                host: location.hostname,
+                cartTotal: breakdown.total,
+                friction: effectiveFriction,
+                engagedPrompt: necessity !== "want" || showAlternatives,
+              } satisfies CartInterventionPayload,
+            });
+          }
           onOpenChange(false);
-          router.replace("/dashboard");
+          extensionAwareReplace(router, "/dashboard");
         }}
       />
     );
@@ -104,8 +165,20 @@ export function InterventionModal({ open, onOpenChange }: Props) {
     toast.success("Purchase complete", {
       description: `${formatCurrency(breakdown!.total)} charged.`,
     });
+    if (typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
+      void chrome.runtime.sendMessage({
+        action: "recordCartIntervention",
+        payload: {
+          kind: "continue",
+          host: location.hostname,
+          cartTotal: breakdown!.total,
+          friction: effectiveFriction,
+          engagedPrompt: necessity !== "want" || showAlternatives,
+        } satisfies CartInterventionPayload,
+      });
+    }
     onOpenChange(false);
-    router.replace("/dashboard");
+    extensionAwareReplace(router, "/dashboard");
   }
 
   function handleSave() {
@@ -115,11 +188,23 @@ export function InterventionModal({ open, onOpenChange }: Props) {
         ? "Demo mode: items will resolve in ~60s."
         : "If you don't return to buy, the amount counts toward your savings.",
     });
+    if (typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
+      void chrome.runtime.sendMessage({
+        action: "recordCartIntervention",
+        payload: {
+          kind: "wait_24h",
+          host: location.hostname,
+          cartTotal: breakdown!.total,
+          friction: effectiveFriction,
+          engagedPrompt: necessity !== "want" || showAlternatives,
+        } satisfies CartInterventionPayload,
+      });
+    }
     onOpenChange(false);
-    router.replace("/dashboard");
+    extensionAwareReplace(router, "/dashboard");
   }
 
-  const isStrict = decision.level === "strict";
+  const isStrict = effectiveFriction === "strict";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -138,6 +223,40 @@ export function InterventionModal({ open, onOpenChange }: Props) {
         </div>
 
         <div className="space-y-5 px-5 py-5">
+          <div className="space-y-2 rounded-md border border-ink-4 bg-white px-4 py-3">
+            <div className="flex items-center justify-between gap-3">
+              <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-ink-3">
+                Goal first
+              </span>
+              <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-accent">
+                {tone}
+              </span>
+            </div>
+            <div className="flex items-end justify-between gap-4">
+              <div>
+                <div className="text-[28px] font-semibold leading-none tracking-[-0.04em] text-ink num-tabular">
+                  {formatCurrency(config.budgetAmount - remaining)}
+                </div>
+                <p className="mt-1 text-[12px] text-ink-2">
+                  already committed in this budget period.
+                </p>
+              </div>
+              {config.savingsGoal ? (
+                <div className="text-right">
+                  <div className="text-[12px] font-medium text-ink">
+                    {config.savingsGoal.label}
+                  </div>
+                  <div className="font-mono text-[11px] text-ink-3">
+                    {formatCurrency(config.savingsGoal.amount)} goal
+                  </div>
+                </div>
+              ) : null}
+            </div>
+            {adaptive?.explanation ? (
+              <p className="text-[12px] text-ink-2">{adaptive.explanation}</p>
+            ) : null}
+          </div>
+
           {/* Trigger */}
           <div className="flex items-start gap-2">
             <span className="mt-1.5 size-1 shrink-0 rounded-[1px] bg-accent" />
@@ -212,6 +331,19 @@ export function InterventionModal({ open, onOpenChange }: Props) {
                 );
               })}
             </div>
+            {requiresJustification && (
+              <div className="space-y-2 pt-2">
+                <label className="font-mono text-[11px] uppercase tracking-[0.06em] text-ink-3">
+                  One sentence: why now?
+                </label>
+                <textarea
+                  value={justification}
+                  onChange={(e) => setJustification(e.target.value)}
+                  className="min-h-20 w-full rounded border border-ink-4 bg-surface px-3 py-2 text-[13px] text-ink outline-none transition-colors focus:border-accent"
+                  placeholder="What makes this worth buying today?"
+                />
+              </div>
+            )}
           </div>
 
           {/* Alternatives */}
@@ -298,6 +430,7 @@ export function InterventionModal({ open, onOpenChange }: Props) {
             <Button
               variant="ghost"
               onClick={handleBuy}
+              disabled={!canProceed}
               className="text-ink-2 hover:bg-surface-2 hover:text-ink"
             >
               Buy now
@@ -310,6 +443,7 @@ export function InterventionModal({ open, onOpenChange }: Props) {
               )}
               <Button
                 onClick={handleSave}
+                disabled={!canProceed}
                 className="bg-accent text-white hover:bg-accent/90"
               >
                 Save for 24h

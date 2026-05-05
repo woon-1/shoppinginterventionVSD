@@ -15,6 +15,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
+import { extensionAwareReplace } from "@/lib/extension-nav";
+import { HintTooltip } from "@/components/ui/hint-tooltip";
 
 const STEPS = ["Budget", "Essentials", "Friction", "Goal"] as const;
 
@@ -29,19 +31,22 @@ interface DraftConfig {
 
 const FRICTION_META: Record<
   FrictionLevel,
-  { name: string; desc: string }
+  { name: string; desc: string; hint: string }
 > = {
   light: {
     name: "Light",
     desc: "Five-second pause before checkout.",
+    hint: "Minimal interruption — a short breath before you complete non-essential purchases.",
   },
   standard: {
     name: "Standard",
     desc: "Reflection prompt with budget context and three actions.",
+    hint: "Reflection prompts: short questions plus choices to buy, save for later, or leave the cart — with your budget in view.",
   },
   strict: {
     name: "Strict",
     desc: "Same prompt; Save-for-24h is the recommended path.",
+    hint: "Stronger pause for impulses; save-for-later is highlighted so you can walk away without guilt.",
   },
 };
 
@@ -84,7 +89,7 @@ export function SetupWizard() {
       onboardingComplete: true,
     };
     setConfig(config);
-    router.replace("/shop");
+    extensionAwareReplace(router, "/shop");
   }
 
   function toggleCategory(cat: ItemCategory) {
@@ -211,9 +216,12 @@ function BudgetStep({
       />
       <div className="space-y-6">
         <div className="space-y-2">
-          <label className="font-mono text-[11px] uppercase tracking-[0.06em] text-ink-3">
-            Amount
-          </label>
+          <div className="flex items-center gap-1">
+            <label className="font-mono text-[11px] uppercase tracking-[0.06em] text-ink-3">
+              Amount
+            </label>
+            <HintTooltip content="Discretionary budget for wants and non-essentials. Essentials you mark next can step around heavier friction." />
+          </div>
           <div className="flex items-center gap-2">
             <span className="text-[16px] text-ink-3">$</span>
             <BareInput
@@ -320,21 +328,24 @@ function FrictionStep({
               type="button"
               onClick={() => setDraft((d) => ({ ...d, friction: level }))}
               className={cn(
-                "flex w-full flex-col gap-1 rounded border px-4 py-3 text-left transition-colors",
+                "flex w-full items-start gap-2 rounded border px-4 py-3 text-left transition-colors",
                 active
                   ? "border-accent bg-accent-fade"
                   : "border-ink-4 bg-surface hover:border-ink"
               )}
             >
-              <span
-                className={cn(
-                  "text-[14px] font-medium",
-                  active ? "text-accent" : "text-ink"
-                )}
-              >
-                {meta.name}
-              </span>
-              <span className="text-[12px] text-ink-2">{meta.desc}</span>
+              <div className="flex min-w-0 flex-1 flex-col gap-1">
+                <span
+                  className={cn(
+                    "text-[14px] font-medium",
+                    active ? "text-accent" : "text-ink"
+                  )}
+                >
+                  {meta.name}
+                </span>
+                <span className="text-[12px] text-ink-2">{meta.desc}</span>
+              </div>
+              <HintTooltip content={meta.hint} />
             </button>
           );
         })}

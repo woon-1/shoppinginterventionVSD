@@ -10,6 +10,7 @@ import { useAppState } from "@/context/AppStateContext";
 import { isItemEssential } from "@/lib/intervention";
 import { formatCurrency } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { extensionAwareReplace } from "@/lib/extension-nav";
 
 export default function ShopPage() {
   const router = useRouter();
@@ -17,7 +18,7 @@ export default function ShopPage() {
 
   useEffect(() => {
     if (hydrated && !state.config?.onboardingComplete) {
-      router.replace("/setup");
+      extensionAwareReplace(router, "/setup");
     }
   }, [hydrated, state.config, router]);
 
