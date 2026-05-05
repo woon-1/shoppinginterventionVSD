@@ -10,6 +10,9 @@ import {
 } from "./utils";
 import { detectCartCheckoutContext } from "./cart-detection";
 import { mountCartIntervention } from "./cart-intervention-ui";
+import { extractAmazonCartDataWithRetry } from "@/lib/amazon-cart-data";
+import { mountAmazonInterventionSteps } from "./amazon-intervention-steps";
+import { loadExtensionState } from "./utils";
 
 function extractAmazonProduct(): ProductData | null {
   try {
@@ -84,8 +87,28 @@ function initAmazonWishlistButton() {
 function routeAmazonFeatures() {
   const ctx = detectCartCheckoutContext("amazon", window.location.href);
   if (ctx.active) {
-    if (!document.querySelector("[data-pause-cart-host]")) {
-      void mountCartIntervention("amazon", ctx.kind);
+    // Cart/checkout page: use multi-step intervention with cart data
+    if (!document.querySelector("[data-pause-intervention]")) {
+      // Extract cart data and load user state
+      void (async () => {
+        try {
+          const cartData = await extractAmazonCartDataWithRetry();
+          const state = await loadExtensionState();
+          const friction = state?.config?.friction || "standard";
+          const savingsGoal = state?.config?.savingsGoal && state?.savings ? {
+            amount: state.config.savingsGoal.amount,
+            label: state.config.savingsGoal.label,
+            saved: state.savings.totalSaved,
+          } : null;
+
+          console.log('[Pause] cart data and state loaded', { cartData, friction, savingsGoal });
+          void mountAmazonInterventionSteps(cartData, friction, savingsGoal);
+        } catch (err) {
+          console.warn('[Pause] failed to load cart intervention', err);
+          // Fallback to simple intervention if multi-step fails
+          void mountCartIntervention("amazon", ctx.kind);
+        }
+      })();
     }
     return;
   }
@@ -103,8 +126,23 @@ if (document.readyState === "loading") {
 const observer = new MutationObserver(() => {
   const ctx = detectCartCheckoutContext("amazon", window.location.href);
   if (ctx.active) {
-    if (!document.querySelector("[data-pause-cart-host]")) {
-      void mountCartIntervention("amazon", ctx.kind);
+    if (!document.querySelector("[data-pause-intervention], [data-pause-cart-host]")) {
+      // Trigger multi-step intervention
+      void (async () => {
+        try {
+          const cartData = await extractAmazonCartDataWithRetry();
+          const state = await loadExtensionState();
+          const friction = state?.config?.friction || "standard";
+          const savingsGoal = state?.config?.savingsGoal && state?.savings ? {
+            amount: state.config.savingsGoal.amount,
+            label: state.config.savingsGoal.label,
+            saved: state.savings.totalSaved,
+          } : null;
+          void mountAmazonInterventionSteps(cartData, friction, savingsGoal);
+        } catch (err) {
+          void mountCartIntervention("amazon", ctx.kind);
+        }
+      })();
     }
     return;
   }
