@@ -82,10 +82,7 @@ function initAmazonWishlistButton() {
 }
 
 function routeAmazonFeatures() {
-  const ctx = detectCartCheckoutContext(
-    "amazon",
-    window.location.href
-  );
+  const ctx = detectCartCheckoutContext("amazon", window.location.href);
   if (ctx.active) {
     if (!document.querySelector("[data-pause-cart-host]")) {
       void mountCartIntervention("amazon", ctx.kind);

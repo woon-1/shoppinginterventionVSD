@@ -9,15 +9,15 @@ import {
   STORAGE_KEY,
   WishlistItem,
 } from "@/lib/types";
+import {
+  CART_INTERVENTION_STATS_KEY,
+  normalizeStoredCartInterventionStats,
+  updateCartInterventionStats,
+  type CartInterventionPayload,
+  type CartInterventionStats,
+} from "@/lib/intervention-behavior";
 
 const CART_EVENTS_KEY = "pause.cartInterventionEvents.v1";
-
-interface CartInterventionPayload {
-  kind: "wait_24h" | "continue" | "minimize";
-  host: string;
-  cartTotal: number | null;
-  friction: FrictionLevel;
-}
 
 interface RecordCartInterventionRequest {
   action: "recordCartIntervention";
@@ -102,6 +102,13 @@ async function appendCartInterventionEvent(
       { ...payload, at: Date.now(), tabId },
     ].slice(-40);
     await chrome.storage.local.set({ [CART_EVENTS_KEY]: next });
+
+    const statsData = await chrome.storage.local.get(CART_INTERVENTION_STATS_KEY);
+    const stats = normalizeStoredCartInterventionStats(
+      statsData[CART_INTERVENTION_STATS_KEY] as CartInterventionStats | undefined
+    );
+    const nextStats = updateCartInterventionStats(stats, payload, Date.now());
+    await chrome.storage.local.set({ [CART_INTERVENTION_STATS_KEY]: nextStats });
   } catch (e) {
     console.warn("[Pause] cart intervention log:", e);
   }

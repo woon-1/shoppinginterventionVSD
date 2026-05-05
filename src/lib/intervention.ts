@@ -98,3 +98,28 @@ export function findAlternatives(
     .sort((a, b) => a.price - b.price)
     .slice(0, 3);
 }
+
+export type InterventionState =
+  | "initialPause"
+  | "contextFraming"
+  | "reflection"
+  | "decision"
+  | "postDecision";
+
+export const interventionStateMachine = {
+  initialPause: {
+    next: "contextFraming",
+  },
+  contextFraming: {
+    next: "reflection",
+  },
+  reflection: {
+    next: "decision",
+  },
+  decision: {
+    next: "postDecision",
+  },
+  postDecision: {
+    next: null, // End of flow
+  },
+};

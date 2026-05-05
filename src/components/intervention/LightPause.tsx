@@ -8,15 +8,21 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
-const PAUSE_SECONDS = 5;
+const DEFAULT_PAUSE_SECONDS = 5;
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onComplete: () => void;
+  pauseSeconds?: number;
 }
 
-export function LightPause({ open, onOpenChange, onComplete }: Props) {
+export function LightPause({
+  open,
+  onOpenChange,
+  onComplete,
+  pauseSeconds = DEFAULT_PAUSE_SECONDS,
+}: Props) {
   const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
@@ -28,16 +34,16 @@ export function LightPause({ open, onOpenChange, onComplete }: Props) {
     const interval = setInterval(() => {
       const e = (Date.now() - start) / 1000;
       setElapsed(e);
-      if (e >= PAUSE_SECONDS) {
+      if (e >= pauseSeconds) {
         clearInterval(interval);
       }
     }, 80);
     return () => clearInterval(interval);
-  }, [open]);
+  }, [open, pauseSeconds]);
 
-  const pct = Math.min(100, (elapsed / PAUSE_SECONDS) * 100);
-  const done = elapsed >= PAUSE_SECONDS;
-  const remaining = Math.max(0, PAUSE_SECONDS - elapsed).toFixed(1);
+  const pct = Math.min(100, (elapsed / pauseSeconds) * 100);
+  const done = elapsed >= pauseSeconds;
+  const remaining = Math.max(0, pauseSeconds - elapsed).toFixed(1);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -57,7 +63,7 @@ export function LightPause({ open, onOpenChange, onComplete }: Props) {
             />
           </div>
           <div className="font-mono text-[11px] uppercase tracking-[0.08em] text-ink-3">
-            Hold to checkout · 5s
+            Hold to checkout · {pauseSeconds.toFixed(0)}s
           </div>
           {done && (
             <div className="flex w-full justify-center gap-2 border-t border-ink-4 pt-4">

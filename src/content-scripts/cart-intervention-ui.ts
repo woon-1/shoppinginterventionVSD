@@ -4,6 +4,10 @@ import { buildPurchaseFraming, goalSkipDeltaCopy } from "./cart-framing";
 import { extractCartTotal } from "./cart-price";
 import type { CartCheckoutKind } from "./cart-detection";
 import { loadExtensionState } from "./utils";
+import {
+  deriveAdaptiveIntervention,
+  loadStoredCartInterventionStats,
+} from "@/lib/intervention-behavior";
 
 const HOST_ATTR = "data-pause-cart-host";
 const SESSION_PREFIX = "pause.cartCheckpoint:";
@@ -319,12 +323,13 @@ function sendInterventionEvent(payload: {
   host: string;
   cartTotal: number | null;
   friction: FrictionLevel;
+  engagedPrompt?: boolean;
 }) {
   try {
-    chrome.runtime.sendMessage({
-      action: "recordCartIntervention",
-      payload,
-    });
+    const runtime = (globalThis as typeof globalThis & {
+      chrome?: { runtime?: { sendMessage: (message: unknown) => void } };
+    }).chrome?.runtime;
+    runtime?.sendMessage({ action: "recordCartIntervention", payload });
   } catch {
     /* ignore */
   }
@@ -341,391 +346,176 @@ function mountShadow(host: HTMLElement): ShadowRoot {
 export async function mountCartIntervention(
   website: WishlistItem["website"],
   kind: CartCheckoutKind
-): Promise<void> {
-  if (typeof document === "undefined" || !document.body) return;
+) {
+  // Prevent duplicate overlays
   if (document.querySelector(`[${HOST_ATTR}]`)) return;
 
+  // Load user state (savings goal, friction level, etc.)
   const state = await loadExtensionState();
-  const config = state?.config;
-  if (!config?.onboardingComplete) return;
+  const goal = state?.config?.savingsGoal;
+  const friction = state?.config?.friction || "standard";
 
-  const hostName = location.hostname;
-  const until = readDeferUntil(hostName);
-  if (until != null && until > Date.now()) return;
+  // Extract cart context (total, items)
+  const cart = extractCartTotal(website);
+  const cartTotal = cart ?? null;
 
-  const sk = sessionKey();
-  if (sessionStorage.getItem(sk)) return;
-
-  let cartTotal = extractCartTotal(website);
-  if (cartTotal == null || cartTotal <= 0) {
-    await new Promise((r) => setTimeout(r, 600));
-    cartTotal = extractCartTotal(website);
+  const deferUntil = readDeferUntil(location.hostname);
+  if (deferUntil && deferUntil > Date.now()) {
+    return;
   }
 
-  const friction = config.friction ?? "standard";
-  const savings = state!.savings;
-  const goal = config.savingsGoal;
-  const goalAmount = goal?.amount ?? 0;
-  const saved = savings.totalSaved;
-  const goalPct =
-    goalAmount > 0 ? Math.min(100, Math.round((saved / goalAmount) * 100)) : 0;
-
-  const framing = buildPurchaseFraming(cartTotal, config, state!.purchases);
-  const skipCopy =
-    goal && goalAmount > 0
-      ? goalSkipDeltaCopy(cartTotal, saved, goalAmount, goal.label)
+  const stats = await loadStoredCartInterventionStats();
+  const adaptive = deriveAdaptiveIntervention(friction, stats, cartTotal);
+  const pauseSeconds = Math.max(1.5, adaptive.pauseMs / 1000);
+  const framing = state?.config
+    ? buildPurchaseFraming(cartTotal, state.config, state.purchases)
+    : null;
+  const goalDelta =
+    goal && cartTotal != null && state?.savings
+      ? goalSkipDeltaCopy(
+          cartTotal,
+          state.savings.totalSaved,
+          goal.amount,
+          goal.label
+        )
       : null;
+  const supportingLines = [
+    ...(goalDelta ? [goalDelta] : []),
+    ...(framing?.supportingLines ?? []),
+  ].slice(0, 3);
+  const progressPct =
+    goal && state?.savings
+      ? Math.max(0, Math.min(100, (state.savings.totalSaved / goal.amount) * 100))
+      : 0;
+  const totalText =
+    cartTotal == null
+      ? "We could not read the cart total."
+      : formatCurrency(cartTotal);
+  const kindLabel = kind === "checkout" ? "Checkout checkpoint" : "Cart checkpoint";
+  const frictionLabel =
+    adaptive.friction === "strict"
+      ? "Strong"
+      : adaptive.friction === "light"
+        ? "Light"
+        : "Standard";
 
-  const goalType =
-    config.interventionPreferences?.goalTypeLabel?.trim() || goal?.label;
-
+  // Create overlay
   const host = document.createElement("div");
-  host.setAttribute(HOST_ATTR, "true");
-  host.setAttribute(
-    "aria-live",
-    friction === "light" ? "polite" : "assertive"
-  );
+  host.setAttribute(HOST_ATTR, "");
+  host.innerHTML = `
+    <div class="backdrop">
+      <div class="panel" tabindex="-1">
+        <div class="inner">
+          <p class="eyebrow">${kindLabel}</p>
+          <h1 class="title">${
+            adaptive.friction === "strict"
+              ? "Take the strong pause."
+              : "Does this purchase still feel intentional?"
+          }</h1>
+          <p class="lede">${adaptive.explanation}</p>
 
-  const shadow = mountShadow(host);
+          <div class="goal-card">
+            <div class="goal-row">
+              <div class="ring-wrap">
+                ${svgProgressRing(progressPct)}
+              </div>
+              <div class="goal-meta">
+                <p class="goal-label">${goal ? goal.label : "Your goal"}</p>
+                <p class="goal-nums">${
+                  goal
+                    ? `${formatCurrency(state?.savings?.totalSaved ?? 0)} saved · ${formatCurrency(goal.amount)} goal`
+                    : `${frictionLabel} friction`
+                }</p>
+              </div>
+            </div>
+            <p class="delta-note">${totalText}</p>
+            ${supportingLines.map((line) => `<p class="lede">${line}</p>`).join("")}
+          </div>
+
+          <p class="footer-hint" data-pause-countdown>Hold to checkout · ${pauseSeconds.toFixed(0)}s</p>
+
+          <div class="actions">
+            <button class="btn-wait">Wait / Save for later</button>
+            <button class="btn-continue" disabled>Continue to checkout</button>
+            <button class="btn-close">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Inject styles into document
+  if (!document.querySelector('style[data-pause-styles]')) {
+    const styleTag = document.createElement('style');
+    styleTag.setAttribute('data-pause-styles', '');
+    styleTag.textContent = styles;
+    document.head.appendChild(styleTag);
+    console.log('[Pause] style tag injected');
+  }
+
+  // Append to DOM
+  console.log('[Pause] appending cart intervention overlay to DOM', { host: location.hostname });
   document.body.appendChild(host);
+  console.log('[Pause] overlay appended', { exists: !!document.querySelector('[data-pause-cart-host]') });
 
-  const place = kind === "checkout" ? "checkout" : "cart";
+  const continueButton = host.querySelector(
+    ".btn-continue"
+  ) as HTMLButtonElement | null;
+  const countdown = host.querySelector("[data-pause-countdown]");
+  if (continueButton) {
+    const holdMs = pauseSeconds * 1000;
+    const start = Date.now();
+    const interval = window.setInterval(() => {
+      const elapsed = Date.now() - start;
+      const remaining = Math.max(0, holdMs - elapsed);
+      const remainingSeconds = Math.max(0, Math.ceil(remaining / 1000));
+      if (countdown) {
+        countdown.textContent = `Hold to checkout · ${remainingSeconds}s`;
+      }
+      if (remaining <= 0) {
+        continueButton.disabled = false;
+        window.clearInterval(interval);
+      }
+    }, 100);
+  }
 
-  let detachEscape: (() => void) | null = null;
-
-  function collapseToWidget(mode: "wait" | "idle") {
-    detachEscape?.();
-    detachEscape = null;
-    sessionStorage.setItem(sk, "1");
-    shadow.innerHTML = "";
-    const style = document.createElement("style");
-    style.textContent = styles;
-    shadow.appendChild(style);
-
-    const w = document.createElement("aside");
-    w.className = "widget";
-    w.setAttribute("role", "complementary");
-    w.setAttribute(
-      "aria-label",
-      "Pause: savings progress and quick actions"
+  // Add event listeners
+  host.querySelector(".btn-wait")?.addEventListener("click", () => {
+    localStorage.setItem(
+      deferKey(location.hostname),
+      String(Date.now() + 30 * 60 * 1000)
     );
-
-    const row = document.createElement("div");
-    row.className = "widget-row";
-    const left = document.createElement("div");
-    const wTitle = document.createElement("div");
-    wTitle.style.fontWeight = "650";
-    wTitle.style.fontSize = "13px";
-    wTitle.style.color = "#171717";
-    wTitle.textContent = "Pause";
-    const wSub = document.createElement("div");
-    wSub.className = "widget-mini";
-    wSub.textContent = goalType
-      ? `${goalType} · ${goalPct}%`
-      : `Progress toward your goal · ${goalPct}%`;
-    left.append(wTitle, wSub);
-    row.appendChild(left);
-
-    const bar = document.createElement("div");
-    bar.className = "widget-bar";
-    const fill = document.createElement("div");
-    fill.className = "widget-fill";
-    fill.style.width = `${goalPct}%`;
-    bar.appendChild(fill);
-
-    const actions = document.createElement("div");
-    actions.className = "widget-actions";
-
-    const reopen = document.createElement("button");
-    reopen.type = "button";
-    reopen.className = "accent";
-    reopen.textContent = "Open pause";
-    reopen.addEventListener("click", () => {
-      sessionStorage.removeItem(sk);
-      host.remove();
-      void mountCartIntervention(website, kind);
+    sendInterventionEvent({
+      kind: "wait_24h",
+      host: location.hostname,
+      cartTotal,
+      friction: adaptive.friction,
     });
+    host.remove();
+  });
 
-    const cont = document.createElement("button");
-    cont.type = "button";
-    cont.textContent = "Continue shopping";
-    cont.addEventListener("click", () => {
-      host.remove();
+  host.querySelector(".btn-continue")?.addEventListener("click", () => {
+    sendInterventionEvent({
+      kind: "continue",
+      host: location.hostname,
+      cartTotal,
+      friction: adaptive.friction,
+      engagedPrompt: true,
     });
+    host.remove();
+  });
 
-    actions.append(reopen, cont);
-    w.append(row, bar, actions);
-
-    if (mode === "wait") {
-      const note = document.createElement("p");
-      note.style.cssText =
-        "margin:10px 0 0;font-size:11px;color:#525252;line-height:1.4";
-      note.textContent =
-        "You chose a 24-hour pause on this site. Come back anytime; this chip stays out of your way.";
-      w.appendChild(note);
-    }
-
-    shadow.appendChild(w);
-  }
-
-  function renderModal() {
-    const wrap = document.createElement("div");
-    wrap.className = `backdrop ${friction === "light" ? "light" : ""}`;
-
-    const panel = document.createElement("div");
-    panel.className = "panel";
-    panel.setAttribute("role", "dialog");
-    panel.setAttribute("aria-modal", "true");
-    panel.setAttribute("aria-labelledby", "pause-dialog-title");
-    panel.setAttribute("aria-describedby", "pause-dialog-desc");
-    panel.tabIndex = -1;
-
-    const inner = document.createElement("div");
-    inner.className = "inner";
-
-    const headerRow = document.createElement("div");
-    headerRow.className = "header-row";
-
-    const closeBtn = document.createElement("button");
-    closeBtn.type = "button";
-    closeBtn.className = "close-btn";
-    closeBtn.setAttribute("aria-label", "Minimize pause panel");
-    closeBtn.innerHTML = "&times;";
-    closeBtn.addEventListener("click", () => {
-      sendInterventionEvent({
-        kind: "minimize",
-        host: hostName,
-        cartTotal,
-        friction,
-      });
-      collapseToWidget("idle");
+  host.querySelector(".btn-close")?.addEventListener("click", () => {
+    localStorage.setItem(
+      deferKey(location.hostname),
+      String(Date.now() + 10 * 60 * 1000)
+    );
+    sendInterventionEvent({
+      kind: "minimize",
+      host: location.hostname,
+      cartTotal,
+      friction: adaptive.friction,
     });
-
-    headerRow.appendChild(closeBtn);
-
-    const eyebrow = document.createElement("div");
-    eyebrow.className = "eyebrow";
-    eyebrow.textContent =
-      place === "checkout" ? "At checkout" : "In your cart";
-
-    const title = document.createElement("h2");
-    title.className = "title";
-    title.id = "pause-dialog-title";
-    title.textContent = "A pause, not a stop";
-
-    const lede = document.createElement("p");
-    lede.className = "lede";
-    lede.id = "pause-dialog-desc";
-    lede.textContent =
-      friction === "light"
-        ? "A short checkpoint so your spending can follow what you care about — you can always continue."
-        : "You’re in control. This is a gentle checkpoint to align this moment with your goals — without shame or pressure.";
-
-    inner.append(headerRow, eyebrow, title, lede);
-
-    if (goal && goalAmount > 0) {
-      const gc = document.createElement("div");
-      gc.className = "goal-card";
-      const row = document.createElement("div");
-      row.className = "goal-row";
-
-      const ring = document.createElement("div");
-      ring.className = "ring-wrap";
-      ring.innerHTML = svgProgressRing(goalPct);
-      ring.setAttribute("aria-hidden", "true");
-
-      const meta = document.createElement("div");
-      meta.className = "goal-meta";
-
-      const gl = document.createElement("div");
-      gl.className = "goal-label";
-      gl.textContent = goal.label;
-
-      const nums = document.createElement("div");
-      nums.className = "goal-nums";
-      nums.textContent = `${formatCurrency(saved)} of ${formatCurrency(
-        goalAmount
-      )} · ${goalPct}%`;
-
-      meta.append(gl, nums);
-      row.append(ring, meta);
-      gc.appendChild(row);
-
-      if (skipCopy && friction !== "light") {
-        const dn = document.createElement("p");
-        dn.className = "delta-note";
-        dn.textContent = skipCopy;
-        gc.appendChild(dn);
-      }
-
-      inner.appendChild(gc);
-    } else if (friction !== "light") {
-      const hint = document.createElement("div");
-      hint.className = "goal-card";
-      const hl = document.createElement("div");
-      hl.className = "goal-label";
-      hl.textContent = "Savings snapshot";
-      const sub = document.createElement("div");
-      sub.className = "goal-nums";
-      sub.style.marginTop = "6px";
-      sub.textContent =
-        "You haven't set a named goal in Pause yet — totals still help you reflect.";
-      hint.append(hl, sub);
-      inner.appendChild(hint);
-    }
-
-    const framingEl = document.createElement("div");
-    framingEl.className = "framing";
-    const fh = document.createElement("p");
-    fh.style.fontWeight = "600";
-    fh.style.color = "#262626";
-    fh.style.fontSize = "13px";
-    fh.textContent = framing.headline;
-    framingEl.appendChild(fh);
-    for (const line of framing.supportingLines) {
-      const p = document.createElement("p");
-      p.textContent = line;
-      framingEl.appendChild(p);
-    }
-    inner.appendChild(framingEl);
-
-    if (friction !== "light") {
-      const fs = document.createElement("fieldset");
-      fs.className = "prompts";
-      const leg = document.createElement("legend");
-      leg.textContent = "Optional reflections";
-      fs.appendChild(leg);
-
-      const chips = document.createElement("div");
-      chips.className = "chips";
-
-      const prompts: { id: string; label: string }[] = [
-        { id: "tomorrow", label: "Still want this after a day?" },
-        { id: "priorities", label: "Fits my priorities right now?" },
-        { id: "elsewhere", label: "What else could this cover?" },
-      ];
-
-      for (const pr of prompts) {
-        const b = document.createElement("button");
-        b.type = "button";
-        b.className = "chip";
-        b.setAttribute("aria-pressed", "false");
-        b.textContent = pr.label;
-        b.addEventListener("click", () => {
-          const pressed = b.getAttribute("aria-pressed") === "true";
-          b.setAttribute("aria-pressed", pressed ? "false" : "true");
-        });
-        chips.appendChild(b);
-      }
-      fs.appendChild(chips);
-      inner.appendChild(fs);
-    }
-
-    const actions = document.createElement("div");
-    actions.className = "actions";
-
-    const waitRow = document.createElement("div");
-    waitRow.style.display = "flex";
-    waitRow.style.alignItems = "center";
-    waitRow.style.gap = "8px";
-    waitRow.style.width = "100%";
-
-    const waitBtn = document.createElement("button");
-    waitBtn.type = "button";
-    waitBtn.className = "btn btn-primary";
-    waitBtn.style.flex = "1";
-    waitBtn.textContent = "Wait 24 hours";
-
-    if (friction === "strict") {
-      const rec = document.createElement("span");
-      rec.className = "badge-rec";
-      rec.textContent = "Suggested";
-      waitRow.appendChild(waitBtn);
-      waitRow.appendChild(rec);
-    } else {
-      waitRow.appendChild(waitBtn);
-    }
-
-    const continueBtn = document.createElement("button");
-    continueBtn.type = "button";
-    continueBtn.className = "btn btn-quiet";
-    continueBtn.textContent = "Continue to checkout";
-
-    const saveLater = document.createElement("button");
-    saveLater.type = "button";
-    saveLater.className = "btn btn-ghost";
-    saveLater.textContent = "Save for later on this device";
-
-    waitBtn.addEventListener("click", () => {
-      try {
-        localStorage.setItem(deferKey(hostName), String(Date.now() + 86400000));
-      } catch {
-        /* ignore */
-      }
-      sendInterventionEvent({
-        kind: "wait_24h",
-        host: hostName,
-        cartTotal,
-        friction,
-      });
-      collapseToWidget("wait");
-    });
-
-    continueBtn.addEventListener("click", () => {
-      sendInterventionEvent({
-        kind: "continue",
-        host: hostName,
-        cartTotal,
-        friction,
-      });
-      collapseToWidget("idle");
-    });
-
-    saveLater.addEventListener("click", () => {
-      sendInterventionEvent({
-        kind: "minimize",
-        host: hostName,
-        cartTotal,
-        friction,
-      });
-      collapseToWidget("idle");
-    });
-
-    actions.appendChild(waitRow);
-    actions.appendChild(continueBtn);
-    actions.appendChild(saveLater);
-
-    const hint = document.createElement("p");
-    hint.className = "footer-hint";
-    hint.textContent =
-      "Nothing here locks checkout — Pause only adds space to choose.";
-
-    inner.appendChild(actions);
-    inner.appendChild(hint);
-
-    panel.appendChild(inner);
-    wrap.appendChild(panel);
-
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      e.preventDefault();
-      sendInterventionEvent({
-        kind: "minimize",
-        host: hostName,
-        cartTotal,
-        friction,
-      });
-      collapseToWidget("idle");
-    };
-    document.addEventListener("keydown", onKey);
-    detachEscape = () => document.removeEventListener("keydown", onKey);
-
-    shadow.appendChild(wrap);
-
-    requestAnimationFrame(() => {
-      panel.focus();
-    });
-  }
-
-  renderModal();
+    host.remove();
+  });
 }

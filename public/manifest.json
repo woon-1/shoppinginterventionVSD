@@ -27,6 +27,8 @@
   ],
   "host_permissions": [
     "*://www.amazon.com/*",
+    "*://amazon.com/*",
+    "*://*.amazon.com/*",
     "*://www.amazon.com.br/*",
     "*://www.amazon.ca/*",
     "*://www.amazon.co.uk/*",
