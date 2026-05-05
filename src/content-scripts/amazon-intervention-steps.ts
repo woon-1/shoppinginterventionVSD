@@ -22,13 +22,61 @@ const frictionConfigs: Record<FrictionLevel, StepConfig> = {
 };
 
 const reflectionQuestions = [
-  "Why do you need this?",
-  "Would you still buy this tomorrow?",
-  "What are you giving up by buying this now?",
-  "Is this purchase planned, urgent, or emotional?",
+  "Do I actually need this-or do I just want it right now?",
+  "Would I feel good about this purchase tomorrow?",
+  "What am I giving up by spending this today?",
 ];
 
-const reasonOptions = ['Need', 'Want', 'Replacement', 'Gift', 'Stress/Boredom', 'Not sure'];
+const reflectionReasonGroups = [
+  {
+    label: 'Primary intent',
+    options: ['Need', 'Replace something broken', 'Planned purchase'],
+  },
+  {
+    label: 'Impulse signals',
+    options: ['Want it right now', 'Bored / stressed', "It's a deal / urgency"],
+  },
+  {
+    label: 'Uncertainty',
+    options: ['Not sure yet'],
+  },
+] as const;
+
+const impulseReasons = new Set(['Want it right now', 'Bored / stressed', "It's a deal / urgency"]);
+const primaryIntentReasons = new Set(['Need', 'Replace something broken', 'Planned purchase']);
+
+function isImpulseReasonSelected(reasons: string[]): boolean {
+  return reasons.some((reason) => impulseReasons.has(reason));
+}
+
+function hasOnlyPrimaryIntent(reasons: string[]): boolean {
+  return reasons.length > 0 && reasons.every((reason) => primaryIntentReasons.has(reason));
+}
+
+function getMicroFeedback(reasons: string[]): string | null {
+  if (reasons.includes('Bored / stressed')) {
+    return 'This feeling might pass-want to give it a bit?';
+  }
+  if (reasons.includes('Want it right now')) {
+    return 'Impulse fades quickly. You can always come back.';
+  }
+  if (reasons.includes("It's a deal / urgency")) {
+    return 'Urgency can feel loud in the moment. A short wait can clarify things.';
+  }
+  if (reasons.includes('Not sure yet')) {
+    return "That's usually a good moment to wait.";
+  }
+  if (reasons.includes('Need')) {
+    return 'Makes sense-just double check timing.';
+  }
+  if (reasons.includes('Planned purchase')) {
+    return 'Planned helps. Check if now is still the best moment.';
+  }
+  if (reasons.includes('Replace something broken')) {
+    return 'Totally fair-if it can wait a little, you can still choose with a clear head.';
+  }
+  return null;
+}
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
@@ -194,6 +242,26 @@ const styles = `
   margin-bottom: 8px;
 }
 
+.pause-question-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pause-reason-group {
+  margin-top: 12px;
+}
+
+.pause-reason-group-label {
+  display: inline-block;
+  margin-bottom: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #737373;
+}
+
 .pause-reason-chips {
   display: flex;
   flex-wrap: wrap;
@@ -221,6 +289,38 @@ const styles = `
   border-color: var(--pause-primary);
   background: var(--pause-secondary);
   color: var(--pause-primary);
+}
+
+.pause-micro-feedback {
+  margin-top: 10px;
+  font-size: 13px;
+  color: #0f766e;
+  background: #ecfdf5;
+  border: 1px solid #99f6e4;
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.pause-required-note {
+  margin-top: 10px;
+  font-size: 12px;
+  color: #737373;
+}
+
+.pause-required-note.alert {
+  color: #b91c1c;
+}
+
+.pause-spend-callout {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid #99f6e4;
+  background: #ecfdf5;
+  font-size: 18px;
+  font-weight: 700;
+  color: #0f766e;
+  text-align: center;
 }
 
 .pause-actions {
@@ -279,6 +379,10 @@ const styles = `
   padding: 16px 18px;
   font-size: 16px;
   box-shadow: 0 10px 20px rgba(15, 118, 110, 0.18);
+}
+
+.pause-btn-wait-emphasis {
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.2), 0 12px 22px rgba(15, 118, 110, 0.24);
 }
 
 .pause-btn-primary:hover:not(:disabled) {
@@ -355,8 +459,9 @@ export async function mountAmazonInterventionSteps(
   let currentStep: InterventionStep = 'pause';
   let userResponses = {
     reflectionAnswered: false,
-    reasonSelected: '',
+    selectedReasons: [] as string[],
   };
+  let reflectionTriedWithoutSelection = false;
   let isSaving = false;
   let saveLines: string[] = [];
   let savedCount = 0;
@@ -444,6 +549,20 @@ export async function mountAmazonInterventionSteps(
     }
 
     if (action === 'next') {
+      if (currentStep === 'reflection') {
+        if (userResponses.selectedReasons.length === 0) {
+          reflectionTriedWithoutSelection = true;
+          renderStep();
+          return;
+        }
+
+        reflectionTriedWithoutSelection = false;
+        userResponses.reflectionAnswered = true;
+        currentStep = hasOnlyPrimaryIntent(userResponses.selectedReasons) ? 'decision' : 'impact';
+        renderStep();
+        return;
+      }
+
       const steps: InterventionStep[] = ['pause', 'timer', 'reflection', 'impact', 'decision'];
       const idx = steps.indexOf(currentStep);
       if (idx < steps.length - 1) {
@@ -454,12 +573,15 @@ export async function mountAmazonInterventionSteps(
     }
 
     if (action === 'reason' && reason) {
-      userResponses.reasonSelected = reason;
-      userResponses.reflectionAnswered = true;
-
-      modal.querySelectorAll<HTMLButtonElement>('[data-pause-action="reason"]').forEach((chip) => {
-        chip.setAttribute('aria-pressed', chip.dataset.reason === reason ? 'true' : 'false');
-      });
+      if (userResponses.selectedReasons.includes(reason)) {
+        userResponses.selectedReasons = userResponses.selectedReasons.filter((item) => item !== reason);
+      } else {
+        userResponses.selectedReasons = [...userResponses.selectedReasons, reason];
+      }
+      if (userResponses.selectedReasons.length > 0) {
+        reflectionTriedWithoutSelection = false;
+      }
+      renderStep();
       return;
     }
 
@@ -604,29 +726,54 @@ export async function mountAmazonInterventionSteps(
         }, 1000);
       }, 50);
     } else if (currentStep === 'reflection') {
+      const activeQuestions = reflectionQuestions.slice(0, Math.max(2, Math.min(3, config.reflectionCount)));
+      const selectedCount = userResponses.selectedReasons.length;
+      const microFeedback = getMicroFeedback(userResponses.selectedReasons);
+      const subtotalText = cartData.subtotal ? formatCurrency(cartData.subtotal) : 'this total';
       html += `
-        <p class="pause-eyebrow">Quick reflection</p>
-        <h1 class="pause-title">What is this purchase for?</h1>
+        <p class="pause-eyebrow">Pause check</p>
+        <h1 class="pause-title">Pause-what's really behind this?</h1>
+        <p class="pause-description">Be honest-this is just for you.</p>
         
         <div class="pause-questions">
       `;
       
-      for (let i = 0; i < config.reflectionCount && i < reflectionQuestions.length; i++) {
-        html += `<div class="pause-question">${i + 1}. ${reflectionQuestions[i]}</div>`;
+      html += `<div class="pause-question-list">`;
+      for (let i = 0; i < activeQuestions.length; i++) {
+        html += `<div class="pause-question">${i + 1}. ${activeQuestions[i]}</div>`;
       }
+      html += `</div>`;
 
       html += `
-          <div class="pause-reason-chips">
-            ${reasonOptions.map(reason => `
-              <button class="pause-chip" data-pause-action="reason" data-reason="${reason}">
-                ${reason}
-              </button>
-            `).join('')}
-          </div>
+          ${reflectionReasonGroups.map((group) => `
+            <div class="pause-reason-group">
+              <span class="pause-reason-group-label">${group.label}</span>
+              <div class="pause-reason-chips">
+                ${group.options.map((reason) => `
+                  <button
+                    class="pause-chip"
+                    data-pause-action="reason"
+                    data-reason="${reason}"
+                    aria-pressed="${userResponses.selectedReasons.includes(reason) ? 'true' : 'false'}"
+                  >
+                    ${reason}
+                  </button>
+                `).join('')}
+              </div>
+            </div>
+          `).join('')}
+
+          ${microFeedback ? `<p class="pause-micro-feedback">${microFeedback}</p>` : ''}
+
+          <div class="pause-spend-callout">You're about to spend ${subtotalText}.</div>
+
+          <p class="pause-required-note ${reflectionTriedWithoutSelection ? 'alert' : ''}">
+            ${selectedCount > 0 ? `Selected ${selectedCount} signal${selectedCount === 1 ? '' : 's'}.` : 'Select at least one signal to continue.'}
+          </p>
         </div>
 
-        <button class="pause-btn pause-btn-primary pause-btn-hero" data-pause-action="next">
-          I've thought it through
+        <button class="pause-btn pause-btn-secondary pause-btn-quiet" data-pause-action="next" ${selectedCount === 0 ? 'disabled' : ''}>
+          I still want this
         </button>
       `;
     } else if (currentStep === 'impact') {
@@ -672,15 +819,18 @@ export async function mountAmazonInterventionSteps(
         </button>
       `;
     } else if (currentStep === 'decision') {
+      const impulseSelected = isImpulseReasonSelected(userResponses.selectedReasons);
       html += `
         <p class="pause-eyebrow">What's your choice?</p>
         <h1 class="pause-title">Your call.</h1>
+        ${cartData.subtotal ? `<div class="pause-spend-callout">You're about to spend ${formatCurrency(cartData.subtotal)}.</div>` : ''}
+        ${impulseSelected ? `<p class="pause-micro-feedback">You flagged an impulse signal. Waiting 24 hours may make this choice easier.</p>` : ''}
         
         <div class="pause-actions">
           <button class="pause-btn pause-btn-secondary pause-btn-quiet" data-pause-action="checkout">
-            Continue to checkout
+            Continue anyway
           </button>
-          <button class="pause-btn pause-btn-primary pause-btn-hero" data-pause-action="save-for-later">
+          <button class="pause-btn pause-btn-primary pause-btn-hero ${impulseSelected ? 'pause-btn-wait-emphasis' : ''}" data-pause-action="save-for-later">
             Wait / Save for later
           </button>
           <button class="pause-btn pause-btn-secondary pause-btn-quiet" data-pause-action="review-plan">
