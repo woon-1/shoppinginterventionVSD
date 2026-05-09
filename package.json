@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:ext": "node scripts/watch-extension.mjs",
     "build": "NEXT_EXTENSION_ASSETS=1 next build",
     "postbuild": "node scripts/build-extension.mjs && node scripts/clean-extension-build.mjs && node scripts/externalize-inline-scripts.mjs",
     "start": "next start",
