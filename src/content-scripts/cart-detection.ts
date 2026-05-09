@@ -1,5 +1,4 @@
 import type { WishlistItem } from "@/lib/types";
-import { debounce } from "lodash";
 
 export type CartCheckoutKind = "cart" | "checkout";
 
@@ -94,44 +93,4 @@ export function detectCartCheckoutContext(
   }
 
   return { active: false, kind: "cart" };
-}
-
-// Enhanced detection for Amazon buttons
-function detectAmazonButtons(): boolean {
-  const checkoutButton = document.querySelector(
-    "[name='proceedToCheckout'], .a-button-input, [aria-label*='Proceed to checkout'], [data-testid='checkout-button']"
-  );
-  const buyNowButton = document.querySelector(
-    "[name='buyNow'], [aria-label*='Buy now'], [data-testid='buy-now-button']"
-  );
-  return Boolean(checkoutButton || buyNowButton);
-}
-
-// Debounced observer for dynamic content
-const observeDynamicContent = debounce(() => {
-  if (detectAmazonButtons()) {
-    console.log("Amazon checkout button detected.");
-    // Trigger intervention logic here
-  }
-}, 300);
-
-export function enhancedDetectCartCheckoutContext(
-  website: WishlistItem["website"],
-  href: string
-): CartCheckoutContext {
-  const baseContext = detectCartCheckoutContext(website, href);
-
-  if (website === "amazon") {
-    // Observe dynamic content for Amazon
-    const observer = new MutationObserver(() => {
-      observeDynamicContent();
-    });
-
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true,
-    });
-  }
-
-  return baseContext;
 }

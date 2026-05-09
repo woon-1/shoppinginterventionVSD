@@ -82,6 +82,9 @@ export function AppStateProvider({
   stateRef.current = state;
 
   // Re-read storage after mount; merge Chrome extension storage when present.
+  // Also subscribe to chrome.storage.onChanged so writes from the service
+  // worker (e.g. wishlist adds from a content script) reflect live without
+  // needing the popup to be reopened.
   useEffect(() => {
     const loaded = loadState();
     setState(loaded);
@@ -91,14 +94,21 @@ export function AppStateProvider({
 
     let cancelled = false;
 
+    const applyExtensionState = (extensionState: AppState | undefined) => {
+      if (cancelled || extensionState?.schemaVersion !== 1) return;
+      const next = normalizeAppState(extensionState);
+      // Skip if value is structurally identical — avoids re-render loop when
+      // our own writes echo back through onChanged.
+      setState((prev) =>
+        JSON.stringify(prev) === JSON.stringify(next) ? prev : next
+      );
+    };
+
     const syncFromChromeStorage = async () => {
       if (typeof chrome === "undefined" || !chrome.storage?.local) return;
       try {
         const data = await chrome.storage.local.get(STORAGE_KEY);
-        const extensionState = data[STORAGE_KEY] as AppState | undefined;
-        if (!cancelled && extensionState?.schemaVersion === 1) {
-          setState(normalizeAppState(extensionState));
-        }
+        applyExtensionState(data[STORAGE_KEY] as AppState | undefined);
       } catch {
         // Ignore storage sync failures outside the extension runtime.
       }
@@ -106,8 +116,23 @@ export function AppStateProvider({
 
     void syncFromChromeStorage();
 
+    let removeListener: (() => void) | null = null;
+    if (typeof chrome !== "undefined" && chrome.storage?.onChanged) {
+      const handler = (
+        changes: { [key: string]: chrome.storage.StorageChange },
+        areaName: string
+      ) => {
+        if (areaName !== "local") return;
+        if (!changes[STORAGE_KEY]) return;
+        applyExtensionState(changes[STORAGE_KEY].newValue as AppState | undefined);
+      };
+      chrome.storage.onChanged.addListener(handler);
+      removeListener = () => chrome.storage.onChanged.removeListener(handler);
+    }
+
     return () => {
       cancelled = true;
+      removeListener?.();
     };
   }, []);
 

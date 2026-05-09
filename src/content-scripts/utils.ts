@@ -1,5 +1,6 @@
 // Shared utilities for content scripts
 
+import { debounce } from "lodash";
 import {
   AppState,
   FrictionLevel,
@@ -210,4 +211,50 @@ export function injectButton(
   });
 
   container.appendChild(button);
+}
+
+/**
+ * Watch document.body for the page changes that the site router cares about.
+ *
+ * `tick` is called on initial run and (debounced) on each mutation. Returning
+ * `true` means the page is settled (button or intervention is in the DOM) and
+ * the observer should disconnect — without this, retailer SPAs fire the
+ * callback on every micro-mutation forever. Returns a manual disconnect
+ * handle for callers that need it.
+ */
+export function attachRouteObserver(tick: () => boolean): () => void {
+  let observer: MutationObserver | null = null;
+
+  const settle = () => {
+    if (!observer) return;
+    observer.disconnect();
+    observer = null;
+  };
+
+  const run = debounce(() => {
+    if (!observer) return;
+    try {
+      if (tick()) settle();
+    } catch (err) {
+      console.error("[Pause] route observer tick failed:", err);
+    }
+  }, 250);
+
+  const start = () => {
+    if (!document.body) return;
+    if (tick()) return;
+    observer = new MutationObserver(() => run());
+    observer.observe(document.body, { childList: true, subtree: true });
+  };
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", start, { once: true });
+  } else {
+    start();
+  }
+
+  return () => {
+    run.cancel();
+    settle();
+  };
 }

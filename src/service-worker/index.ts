@@ -140,7 +140,7 @@ async function handleAddToWishlist(
     }
 
     const wishlistItem: WishlistItem = {
-      id: `${request.website}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      id: `${request.website}-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
       name: request.data.name,
       price: request.data.price,
       currency: request.data.currency,
@@ -153,15 +153,8 @@ async function handleAddToWishlist(
     state.wishlist = [...state.wishlist, wishlistItem];
     await saveStoredState(state);
 
-    chrome.runtime.sendMessage(
-      {
-        action: "wishlistUpdated",
-        item: wishlistItem,
-      },
-      () => {
-        void chrome.runtime.lastError;
-      }
-    );
+    // Open popup/UI surfaces pick this up via chrome.storage.onChanged in
+    // AppStateContext — no separate runtime broadcast needed.
 
     sendResponse({
       success: true,

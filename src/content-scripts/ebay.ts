@@ -2,6 +2,7 @@
 // Runs on ebay.com product pages to extract product data and inject wishlist button
 
 import {
+  attachRouteObserver,
   extractCurrency,
   extractPrice,
   injectButton,
@@ -82,39 +83,17 @@ function initEbayWishlistButton() {
   }
 }
 
-function routeEbayFeatures() {
+function tickEbay(): boolean {
   const ctx = detectCartCheckoutContext("ebay", window.location.href);
   if (ctx.active) {
-    if (!document.querySelector("[data-pause-cart-host]")) {
-      void mountCartIntervention("ebay", ctx.kind);
-    }
-    return;
-  }
-  initEbayWishlistButton();
-}
-
-// Initialize when DOM is ready
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", routeEbayFeatures);
-} else {
-  routeEbayFeatures();
-}
-
-// Also try to initialize on dynamic content changes
-const observer = new MutationObserver(() => {
-  const ctx = detectCartCheckoutContext("ebay", window.location.href);
-  if (ctx.active) {
-    if (!document.querySelector("[data-pause-cart-host]")) {
-      void mountCartIntervention("ebay", ctx.kind);
-    }
-    return;
+    if (document.querySelector("[data-pause-cart-host]")) return true;
+    void mountCartIntervention("ebay", ctx.kind);
+    return false;
   }
   if (!document.querySelector("[data-pause-wishlist-button]")) {
     initEbayWishlistButton();
   }
-});
+  return Boolean(document.querySelector("[data-pause-wishlist-button]"));
+}
 
-observer.observe(document.body, {
-  childList: true,
-  subtree: true,
-});
+attachRouteObserver(tickEbay);

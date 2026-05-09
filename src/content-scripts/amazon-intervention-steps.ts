@@ -446,7 +446,14 @@ const styles = `
 export async function mountAmazonInterventionSteps(
   cartData: AmazonCartData,
   friction: FrictionLevel,
-  savingsGoal: { amount: number; label: string; saved: number } | null
+  savingsGoal: { amount: number; label: string; saved: number } | null,
+  /**
+   * Called when the user picks "Continue to checkout" — used by the
+   * click-intercept flow in amazon.ts to resume the original button click
+   * (Proceed to Checkout / Place order / Buy Now) so Amazon's natural
+   * navigation runs.
+   */
+  onContinue?: () => void
 ) {
   // Prevent duplicates
   if (document.querySelector('[data-pause-intervention]')) {
@@ -588,6 +595,7 @@ export async function mountAmazonInterventionSteps(
     if (action === 'checkout') {
       console.log('[Pause] User chose to continue to checkout');
       modal.remove();
+      onContinue?.();
       return;
     }
 

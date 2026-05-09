@@ -1,6 +1,16 @@
+/**
+ * Cart-page intervention overlay used by non-Amazon retailers (Walmart,
+ * eBay, Etsy, Target). Visually matches the InterventionModal Pause design:
+ * Pause + accent dot brand, friction Pill, accent-dot trigger line, the
+ * three-segment budget bar, WHY? Need/Want/Unsure choice group, and a
+ * Buy / RECOMMENDED / Save-for-24h footer.
+ *
+ * Rendered into a Shadow DOM so the host site's CSS can't bleed in or out.
+ */
+
 import type { FrictionLevel, WishlistItem } from "@/lib/types";
 import { formatCurrency } from "@/lib/format";
-import { buildPurchaseFraming, goalSkipDeltaCopy } from "./cart-framing";
+import { remainingBudget, periodLabel } from "@/lib/budget";
 import { extractCartTotal } from "./cart-price";
 import type { CartCheckoutKind } from "./cart-detection";
 import { loadExtensionState } from "./utils";
@@ -8,24 +18,43 @@ import {
   deriveAdaptiveIntervention,
   loadStoredCartInterventionStats,
 } from "@/lib/intervention-behavior";
+import { deriveRecommendation } from "@/lib/intervention";
 
 const HOST_ATTR = "data-pause-cart-host";
-const SESSION_PREFIX = "pause.cartCheckpoint:";
 const DEFER_PREFIX = "pause.deferUntil:";
+
+type Necessity = "need" | "want" | "unsure";
+
+export interface CartInterventionItem {
+  name: string;
+  price: number | null;
+  quantity: number;
+}
+
+export interface CartInterventionOptions {
+  /** Optional line items (currently unused in the rendered UI; kept for API compat). */
+  items?: CartInterventionItem[];
+  /** Called when the user clicks "Buy" — caller resumes the original commit click. */
+  onContinue?: () => void;
+}
 
 const styles = `
 :host {
   all: initial;
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: var(--font-geist-sans, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif);
   font-size: 14px;
   line-height: 1.45;
-  color: #171717;
+  color: #0a0a0a;
 }
 *, *::before, *::after { box-sizing: border-box; }
 button {
   font: inherit;
   cursor: pointer;
+  border: none;
+  background: transparent;
+  color: inherit;
 }
+
 .backdrop {
   position: fixed;
   inset: 0;
@@ -35,261 +64,260 @@ button {
   align-items: center;
   justify-content: center;
   padding: 24px 16px;
+  animation: fadeIn 0.18s ease-out;
 }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
 .panel {
   width: min(440px, 100%);
   max-height: min(92vh, 720px);
-  overflow: auto;
-  background: #fafafa;
-  border: 1px solid #e5e5e5;
-  border-radius: 16px;
-  box-shadow: 0 24px 80px rgba(0,0,0,0.18);
-  outline: none;
-}
-.panel:focus-visible {
-  box-shadow: 0 0 0 2px #fafafa, 0 0 0 4px #0f766e;
-}
-.inner {
-  padding: 20px 20px 16px;
-}
-.eyebrow {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: #737373;
-}
-.title {
-  margin-top: 8px;
-  font-size: 18px;
-  font-weight: 650;
-  letter-spacing: -0.02em;
-}
-.lede {
-  margin-top: 10px;
-  font-size: 13px;
-  color: #404040;
-}
-.goal-card {
-  margin-top: 18px;
-  padding: 14px;
-  border-radius: 12px;
-  background: #fff;
-  border: 1px solid #e5e5e5;
-}
-.goal-row {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-.ring-wrap {
-  width: 72px;
-  height: 72px;
-  flex-shrink: 0;
-}
-.ring-wrap svg { display: block; width: 72px; height: 72px; }
-.goal-meta {
-  flex: 1;
-  min-width: 0;
-}
-.goal-label {
-  font-size: 12px;
-  font-weight: 600;
-  color: #171717;
-}
-.goal-nums {
-  margin-top: 4px;
-  font-size: 12px;
-  color: #525252;
-  font-variant-numeric: tabular-nums;
-}
-.delta-note {
-  margin-top: 10px;
-  font-size: 12px;
-  color: #525252;
-}
-.framing {
-  margin-top: 16px;
-  padding-top: 14px;
-  border-top: 1px solid #e5e5e5;
-}
-.framing p {
-  margin: 0 0 8px;
-  font-size: 12px;
-  color: #404040;
-}
-fieldset.prompts {
-  margin: 16px 0 0;
-  padding: 0;
-  border: none;
-}
-.prompts legend {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: #737373;
-  margin-bottom: 8px;
-}
-.chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.chip {
-  border: 1px solid #d4d4d4;
-  background: #fff;
-  border-radius: 999px;
-  padding: 6px 12px;
-  font-size: 12px;
-  color: #262626;
-}
-.chip[aria-pressed="true"] {
-  border-color: #0f766e;
-  background: #ecfdf5;
-  color: #115e59;
-}
-.actions {
-  margin-top: 18px;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  background: #ffffff;
+  border: 1px solid #d4d4d4;
+  border-radius: 6px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.18);
+  outline: none;
 }
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  border-radius: 10px;
-  padding: 10px 14px;
-  font-size: 13px;
-  font-weight: 600;
-  border: 1px solid transparent;
-  text-decoration: none;
-}
-.btn-primary {
-  background: #0f766e;
-  color: #fff;
-}
-.btn-primary:hover { filter: brightness(1.05); }
-.btn-quiet {
-  background: #fff;
-  border-color: #d4d4d4;
-  color: #262626;
-}
-.btn-quiet:hover { border-color: #a3a3a3; }
-.btn-ghost {
-  background: transparent;
-  color: #525252;
-  border: none;
-  padding: 8px;
-  font-weight: 500;
-}
-.btn-ghost:hover { color: #171717; text-decoration: underline; }
-.footer-hint {
-  margin-top: 10px;
-  font-size: 11px;
-  color: #737373;
-}
-.header-row {
-  display: flex;
-  justify-content: flex-end;
-  align-items: flex-start;
-  gap: 8px;
-}
-.close-btn {
-  border: none;
-  background: transparent;
-  color: #737373;
-  font-size: 22px;
-  line-height: 1;
-  padding: 4px 6px;
-  border-radius: 8px;
-}
-.close-btn:hover { background: #f5f5f5; color: #171717; }
-.badge-rec {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #0f766e;
-}
-.widget {
-  position: fixed;
-  right: 16px;
-  bottom: 16px;
-  z-index: 2147483641;
-  width: min(300px, calc(100vw - 32px));
-  background: #fafafa;
-  border: 1px solid #e5e5e5;
-  border-radius: 14px;
-  box-shadow: 0 16px 48px rgba(0,0,0,0.16);
-  padding: 12px;
-}
-.widget-row {
+
+/* Header */
+.header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
+  padding: 12px 20px;
+  border-bottom: 1px solid #d4d4d4;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.brand-text {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: #0a0a0a;
+}
+.brand-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 1px;
+  background: #5b5cff;
+}
+.pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid #d4d4d4;
+  color: #525252;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* Body */
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.trigger {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.accent-dot {
+  flex-shrink: 0;
+  margin-top: 8px;
+  width: 4px;
+  height: 4px;
+  border-radius: 1px;
+  background: #5b5cff;
+}
+.trigger p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: #0a0a0a;
+}
+.money {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+.over-budget {
+  display: block;
+  margin-top: 2px;
+  color: #dc2626;
+  font-weight: 500;
+}
+
+/* Budget bar */
+.budget {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.budget-labels {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  align-items: end;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+}
+.budget-label-spent { text-align: left; color: #a3a3a3; }
+.budget-label-projected { text-align: center; color: #0a0a0a; font-size: 15px; font-weight: 500; }
+.budget-label-total { text-align: right; color: #a3a3a3; }
+
+.budget-bar {
+  position: relative;
+  height: 6px;
+  width: 100%;
+  border-radius: 999px;
+  background: rgba(212, 212, 212, 0.4);
+  overflow: hidden;
+}
+.budget-bar-spent {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: #a3a3a3;
+}
+.budget-bar-projected {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: #5b5cff;
+}
+.budget-bar-projected.over {
+  background: #dc2626;
+}
+.budget-tick {
+  position: absolute;
+  top: -2px;
+  width: 1px;
+  height: 10px;
+  background: #0a0a0a;
+}
+
+/* Why? */
+.why {
+  display: flex;
+  flex-direction: column;
   gap: 10px;
 }
-.widget-mini {
+.eyebrow {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 11px;
-  color: #525252;
-  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #a3a3a3;
 }
-.widget-bar {
-  margin-top: 8px;
-  height: 4px;
-  background: #e5e5e5;
-  border-radius: 999px;
-  overflow: hidden;
-}
-.widget-fill {
-  height: 100%;
-  background: #0f766e;
-  border-radius: 999px;
-}
-.widget-actions {
-  margin-top: 10px;
-  display: flex;
+.choices {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
   gap: 8px;
-  flex-wrap: wrap;
 }
-.widget-actions button {
-  flex: 1;
-  min-width: 120px;
-  border-radius: 8px;
-  padding: 8px 10px;
-  font-size: 12px;
-  font-weight: 600;
+.choice {
+  height: 44px;
+  border-radius: 6px;
   border: 1px solid #d4d4d4;
-  background: #fff;
+  background: #ffffff;
+  color: #0a0a0a;
+  font-size: 14px;
+  font-weight: 500;
+  transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
 }
-.widget-actions .accent {
-  background: #ecfdf5;
-  border-color: #99f6e4;
-  color: #115e59;
+.choice:hover {
+  border-color: #0a0a0a;
 }
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
+.choice[aria-checked="true"] {
+  border-color: #5b5cff;
+  background: #eeeeff;
+  color: #5b5cff;
+}
+.choice:focus-visible {
+  outline: 2px solid rgba(91, 92, 255, 0.4);
+  outline-offset: 2px;
+}
+
+/* Footer */
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 20px;
+  background: rgba(245, 245, 245, 0.5);
+  border-top: 1px solid #d4d4d4;
+}
+.footer-left {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  color: #a3a3a3;
+  text-decoration: none;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+.footer-left:hover {
+  color: #0a0a0a;
+  text-decoration: underline;
+}
+.footer-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.buy-text {
+  font-size: 14px;
+  font-weight: 500;
+  color: #0a0a0a;
+  cursor: pointer;
   padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0,0,0,0);
-  border: 0;
+  transition: text-decoration 0.15s ease;
 }
-.light .prompts { opacity: 0.85; }
-.light .chip { padding: 5px 10px; font-size: 11px; }
+.buy-text:hover {
+  text-decoration: underline;
+}
+.recommended {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #5b5cff;
+}
+.save-button {
+  height: 38px;
+  padding: 0 16px;
+  border-radius: 6px;
+  background: #5b5cff;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+.save-button:hover {
+  background: rgba(91, 92, 255, 0.9);
+}
+.save-button:focus-visible {
+  outline: 2px solid rgba(91, 92, 255, 0.4);
+  outline-offset: 2px;
+}
 `;
 
 function deferKey(host: string): string {
   return `${DEFER_PREFIX}${host}`;
-}
-
-function sessionKey(): string {
-  return `${SESSION_PREFIX}${location.hostname}${location.pathname}`;
 }
 
 function readDeferUntil(host: string): number | null {
@@ -303,19 +331,35 @@ function readDeferUntil(host: string): number | null {
   }
 }
 
-function svgProgressRing(pct: number): string {
-  const r = 28;
-  const c = 2 * Math.PI * r;
-  const offset = c - (pct / 100) * c;
-  return `
-    <svg viewBox="0 0 72 72" aria-hidden="true">
-      <circle cx="36" cy="36" r="${r}" fill="none" stroke="#e5e5e5" stroke-width="6" />
-      <circle cx="36" cy="36" r="${r}" fill="none" stroke="#0f766e" stroke-width="6"
-        stroke-dasharray="${c}"
-        stroke-dashoffset="${offset}"
-        transform="rotate(-90 36 36)" />
-    </svg>
-  `;
+/**
+ * Click-intercept callers should check this BEFORE preventing the user's
+ * commit click — otherwise a stale defer turns into a trapped user (click
+ * blocked, modal silently bails).
+ */
+export function isHostInterventionDeferred(host: string): boolean {
+  const until = readDeferUntil(host);
+  return until != null && until > Date.now();
+}
+
+/**
+ * For debugging: clear any active defer. Surfaced as
+ * `window.__pauseClearDefer()` so users can run it from DevTools to reset
+ * a stuck state without diving into localStorage manually.
+ */
+declare global {
+  interface Window {
+    __pauseClearDefer?: () => void;
+  }
+}
+if (typeof window !== "undefined") {
+  window.__pauseClearDefer = () => {
+    try {
+      localStorage.removeItem(deferKey(location.hostname));
+      console.log(`[Pause] defer cleared for ${location.hostname}`);
+    } catch (err) {
+      console.warn("[Pause] defer clear failed", err);
+    }
+  };
 }
 
 function sendInterventionEvent(payload: {
@@ -324,198 +368,302 @@ function sendInterventionEvent(payload: {
   cartTotal: number | null;
   friction: FrictionLevel;
   engagedPrompt?: boolean;
+  necessity?: Necessity;
 }) {
   try {
-    const runtime = (globalThis as typeof globalThis & {
-      chrome?: { runtime?: { sendMessage: (message: unknown) => void } };
-    }).chrome?.runtime;
+    const runtime = (
+      globalThis as typeof globalThis & {
+        chrome?: { runtime?: { sendMessage: (message: unknown) => void } };
+      }
+    ).chrome?.runtime;
     runtime?.sendMessage({ action: "recordCartIntervention", payload });
   } catch {
     /* ignore */
   }
 }
 
-function mountShadow(host: HTMLElement): ShadowRoot {
-  const root = host.attachShadow({ mode: "open" });
-  const style = document.createElement("style");
-  style.textContent = styles;
-  root.appendChild(style);
-  return root;
+function frictionPillLabel(friction: FrictionLevel): string {
+  if (friction === "light") return "Light";
+  if (friction === "strict") return "Strict";
+  return "Standard";
+}
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 export async function mountCartIntervention(
   website: WishlistItem["website"],
-  kind: CartCheckoutKind
+  kind: CartCheckoutKind,
+  options: CartInterventionOptions = {}
 ) {
-  // Prevent duplicate overlays
+  const { onContinue } = options;
   if (document.querySelector(`[${HOST_ATTR}]`)) return;
 
-  // Load user state (savings goal, friction level, etc.)
   const state = await loadExtensionState();
-  const goal = state?.config?.savingsGoal;
   const friction = state?.config?.friction || "standard";
-
-  // Extract cart context (total, items)
-  const cart = extractCartTotal(website);
-  const cartTotal = cart ?? null;
-
-  const deferUntil = readDeferUntil(location.hostname);
-  if (deferUntil && deferUntil > Date.now()) {
-    return;
-  }
+  const cartTotal = extractCartTotal(website);
 
   const stats = await loadStoredCartInterventionStats();
   const adaptive = deriveAdaptiveIntervention(friction, stats, cartTotal);
-  const pauseSeconds = Math.max(1.5, adaptive.pauseMs / 1000);
-  const framing = state?.config
-    ? buildPurchaseFraming(cartTotal, state.config, state.purchases)
-    : null;
-  const goalDelta =
-    goal && cartTotal != null && state?.savings
-      ? goalSkipDeltaCopy(
-          cartTotal,
-          state.savings.totalSaved,
-          goal.amount,
-          goal.label
-        )
-      : null;
-  const supportingLines = [
-    ...(goalDelta ? [goalDelta] : []),
-    ...(framing?.supportingLines ?? []),
-  ].slice(0, 3);
-  const progressPct =
-    goal && state?.savings
-      ? Math.max(0, Math.min(100, (state.savings.totalSaved / goal.amount) * 100))
-      : 0;
-  const totalText =
-    cartTotal == null
-      ? "We could not read the cart total."
-      : formatCurrency(cartTotal);
-  const kindLabel = kind === "checkout" ? "Checkout checkpoint" : "Cart checkpoint";
-  const frictionLabel =
-    adaptive.friction === "strict"
-      ? "Strong"
-      : adaptive.friction === "light"
-        ? "Light"
-        : "Standard";
+  const effectiveFriction = adaptive.friction;
 
-  // Create overlay
+  // Budget math — same shape as InterventionModal so the UI feels uniform.
+  const config = state?.config ?? null;
+  const remaining = config ? remainingBudget(config, state?.purchases ?? []) : null;
+  const spent =
+    config && remaining != null
+      ? Math.max(0, config.budgetAmount - remaining)
+      : null;
+  const cartContribution = cartTotal ?? 0;
+  const projectedSpent =
+    spent != null ? spent + cartContribution : null;
+  const overBudget =
+    remaining != null && cartTotal != null && cartTotal > remaining;
+
+  const spentPct =
+    config && spent != null
+      ? Math.min(100, Math.round((spent / Math.max(config.budgetAmount, 1)) * 100))
+      : 0;
+  const projectedPct =
+    config && projectedSpent != null
+      ? Math.min(
+          100,
+          Math.round((projectedSpent / Math.max(config.budgetAmount, 1)) * 100)
+        )
+      : spentPct;
+
+  // Trigger line — assemble explicitly so missing pieces don't make awkward copy.
+  const triggerParts: string[] = [];
+  if (cartTotal != null) {
+    triggerParts.push(
+      `<span class="money">${escapeHtml(formatCurrency(cartTotal))}</span> in cart`
+    );
+  } else {
+    triggerParts.push("Items in cart");
+  }
+  if (config && remaining != null) {
+    triggerParts.push(
+      `<span class="money">${escapeHtml(formatCurrency(remaining))}</span> left ${escapeHtml(periodLabel(config.budgetPeriod))}`
+    );
+  }
+
+  // Host + shadow root for full CSS isolation from the retailer page.
   const host = document.createElement("div");
   host.setAttribute(HOST_ATTR, "");
-  host.innerHTML = `
-    <div class="backdrop">
-      <div class="panel" tabindex="-1">
-        <div class="inner">
-          <p class="eyebrow">${kindLabel}</p>
-          <h1 class="title">${
-            adaptive.friction === "strict"
-              ? "Take the strong pause."
-              : "Does this purchase still feel intentional?"
-          }</h1>
-          <p class="lede">${adaptive.explanation}</p>
+  const shadow = host.attachShadow({ mode: "open" });
+  const styleEl = document.createElement("style");
+  styleEl.textContent = styles;
+  shadow.appendChild(styleEl);
 
-          <div class="goal-card">
-            <div class="goal-row">
-              <div class="ring-wrap">
-                ${svgProgressRing(progressPct)}
-              </div>
-              <div class="goal-meta">
-                <p class="goal-label">${goal ? goal.label : "Your goal"}</p>
-                <p class="goal-nums">${
-                  goal
-                    ? `${formatCurrency(state?.savings?.totalSaved ?? 0)} saved · ${formatCurrency(goal.amount)} goal`
-                    : `${frictionLabel} friction`
-                }</p>
-              </div>
-            </div>
-            <p class="delta-note">${totalText}</p>
-            ${supportingLines.map((line) => `<p class="lede">${line}</p>`).join("")}
+  const panel = document.createElement("div");
+  panel.className = "backdrop";
+
+  const triggerHtml =
+    triggerParts.join(", ") +
+    "." +
+    (overBudget ? ` <span class="over-budget">Over budget.</span>` : "");
+
+  const projectedLabel =
+    projectedSpent != null
+      ? formatCurrency(projectedSpent)
+      : cartTotal != null
+        ? formatCurrency(cartTotal)
+        : "—";
+  const totalLabel = config ? formatCurrency(config.budgetAmount) : "—";
+  const spentLabel = spent != null ? formatCurrency(spent) : "—";
+
+  const recommendation = deriveRecommendation({
+    cartTotal,
+    remaining,
+    friction: effectiveFriction,
+  });
+
+  panel.innerHTML = `
+    <div class="panel" tabindex="-1" role="dialog" aria-modal="true" aria-label="Pause checkpoint">
+      <div class="header">
+        <div class="brand">
+          <span class="brand-text">Pause</span>
+          <span class="brand-dot" aria-hidden="true"></span>
+        </div>
+        <span class="pill">${frictionPillLabel(effectiveFriction)}</span>
+      </div>
+
+      <div class="body">
+        <div class="trigger">
+          <span class="accent-dot" aria-hidden="true"></span>
+          <p>${triggerHtml}</p>
+        </div>
+
+        <div class="budget">
+          <div class="budget-labels">
+            <span class="budget-label-spent">${escapeHtml(spentLabel)}</span>
+            <span class="budget-label-projected">${escapeHtml(projectedLabel)}</span>
+            <span class="budget-label-total">${escapeHtml(totalLabel)}</span>
           </div>
-
-          <p class="footer-hint" data-pause-countdown>Hold to checkout · ${pauseSeconds.toFixed(0)}s</p>
-
-          <div class="actions">
-            <button class="btn-wait">Wait / Save for later</button>
-            <button class="btn-continue" disabled>Continue to checkout</button>
-            <button class="btn-close">Close</button>
+          <div class="budget-bar" aria-hidden="true">
+            <div class="budget-bar-spent" style="width: ${spentPct}%"></div>
+            <div class="budget-bar-projected ${overBudget ? "over" : ""}"
+                 style="left: ${spentPct}%; width: ${Math.max(0, projectedPct - spentPct)}%"></div>
+            <div class="budget-tick" style="left: ${projectedPct}%"></div>
           </div>
+        </div>
+
+        <div class="why">
+          <span class="eyebrow">Why?</span>
+          <div class="choices" role="radiogroup" aria-label="Why are you buying this?">
+            <button class="choice" data-necessity="need" type="button" role="radio" aria-checked="false">Need</button>
+            <button class="choice" data-necessity="want" type="button" role="radio" aria-checked="true">Want</button>
+            <button class="choice" data-necessity="unsure" type="button" role="radio" aria-checked="false">Unsure</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer">
+        <button class="footer-left" data-action="dismiss" type="button">Maybe later</button>
+        <div class="footer-right">
+          ${
+            recommendation === "buy"
+              ? `<span class="recommended">Recommended</span>`
+              : ""
+          }
+          <button class="buy-text" data-action="buy" type="button">Buy</button>
+          ${
+            recommendation === "save"
+              ? `<span class="recommended">Recommended</span>`
+              : ""
+          }
+          <button class="save-button" data-action="save-24h" type="button">Save for 24h</button>
         </div>
       </div>
     </div>
   `;
 
-  // Inject styles into document
-  if (!document.querySelector('style[data-pause-styles]')) {
-    const styleTag = document.createElement('style');
-    styleTag.setAttribute('data-pause-styles', '');
-    styleTag.textContent = styles;
-    document.head.appendChild(styleTag);
-    console.log('[Pause] style tag injected');
-  }
-
-  // Append to DOM
-  console.log('[Pause] appending cart intervention overlay to DOM', { host: location.hostname });
+  shadow.appendChild(panel);
   document.body.appendChild(host);
-  console.log('[Pause] overlay appended', { exists: !!document.querySelector('[data-pause-cart-host]') });
 
-  const continueButton = host.querySelector(
-    ".btn-continue"
-  ) as HTMLButtonElement | null;
-  const countdown = host.querySelector("[data-pause-countdown]");
-  if (continueButton) {
-    const holdMs = pauseSeconds * 1000;
-    const start = Date.now();
-    const interval = window.setInterval(() => {
-      const elapsed = Date.now() - start;
-      const remaining = Math.max(0, holdMs - elapsed);
-      const remainingSeconds = Math.max(0, Math.ceil(remaining / 1000));
-      if (countdown) {
-        countdown.textContent = `Hold to checkout · ${remainingSeconds}s`;
-      }
-      if (remaining <= 0) {
-        continueButton.disabled = false;
-        window.clearInterval(interval);
-      }
-    }, 100);
+  // Default selection
+  let necessity: Necessity = "want";
+  const setActive = (n: Necessity) => {
+    necessity = n;
+    const buttons = panel.querySelectorAll<HTMLButtonElement>(".choice");
+    for (const btn of buttons) {
+      btn.setAttribute(
+        "aria-checked",
+        btn.dataset.necessity === n ? "true" : "false"
+      );
+    }
+  };
+  // Set initial active state in DOM (HTML defaults to want=true; ensure consistent)
+  setActive("want");
+
+  panel.querySelectorAll<HTMLButtonElement>(".choice").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const next = (btn.dataset.necessity as Necessity | undefined) ?? "want";
+      setActive(next);
+    });
+  });
+
+  function close() {
+    host.remove();
+    document.removeEventListener("keydown", onKey, true);
   }
 
-  // Add event listeners
-  host.querySelector(".btn-wait")?.addEventListener("click", () => {
-    localStorage.setItem(
-      deferKey(location.hostname),
-      String(Date.now() + 30 * 60 * 1000)
-    );
-    sendInterventionEvent({
-      kind: "wait_24h",
-      host: location.hostname,
-      cartTotal,
-      friction: adaptive.friction,
-    });
-    host.remove();
+  function onKey(e: KeyboardEvent) {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      sendInterventionEvent({
+        kind: "minimize",
+        host: location.hostname,
+        cartTotal,
+        friction: effectiveFriction,
+        necessity,
+      });
+      close();
+    }
+  }
+  document.addEventListener("keydown", onKey, true);
+
+  // Backdrop click closes (clicking inside the panel does not bubble out).
+  panel.addEventListener("click", (e) => {
+    if (e.target === panel) {
+      sendInterventionEvent({
+        kind: "minimize",
+        host: location.hostname,
+        cartTotal,
+        friction: effectiveFriction,
+        necessity,
+      });
+      close();
+    }
   });
 
-  host.querySelector(".btn-continue")?.addEventListener("click", () => {
-    sendInterventionEvent({
-      kind: "continue",
-      host: location.hostname,
-      cartTotal,
-      friction: adaptive.friction,
-      engagedPrompt: true,
+  // Action wiring
+  panel
+    .querySelector<HTMLButtonElement>('[data-action="buy"]')
+    ?.addEventListener("click", () => {
+      sendInterventionEvent({
+        kind: "continue",
+        host: location.hostname,
+        cartTotal,
+        friction: effectiveFriction,
+        necessity,
+        engagedPrompt: necessity !== "want",
+      });
+      close();
+      onContinue?.();
     });
-    host.remove();
-  });
 
-  host.querySelector(".btn-close")?.addEventListener("click", () => {
-    localStorage.setItem(
-      deferKey(location.hostname),
-      String(Date.now() + 10 * 60 * 1000)
-    );
-    sendInterventionEvent({
-      kind: "minimize",
-      host: location.hostname,
-      cartTotal,
-      friction: adaptive.friction,
+  panel
+    .querySelector<HTMLButtonElement>('[data-action="save-24h"]')
+    ?.addEventListener("click", () => {
+      try {
+        localStorage.setItem(
+          deferKey(location.hostname),
+          String(Date.now() + 24 * 60 * 60 * 1000)
+        );
+      } catch {
+        /* ignore quota errors */
+      }
+      sendInterventionEvent({
+        kind: "wait_24h",
+        host: location.hostname,
+        cartTotal,
+        friction: effectiveFriction,
+        necessity,
+        engagedPrompt: true,
+      });
+      close();
     });
-    host.remove();
-  });
+
+  panel
+    .querySelector<HTMLButtonElement>('[data-action="dismiss"]')
+    ?.addEventListener("click", () => {
+      try {
+        localStorage.setItem(
+          deferKey(location.hostname),
+          String(Date.now() + 30 * 60 * 1000)
+        );
+      } catch {
+        /* ignore */
+      }
+      sendInterventionEvent({
+        kind: "minimize",
+        host: location.hostname,
+        cartTotal,
+        friction: effectiveFriction,
+        necessity,
+      });
+      close();
+    });
+
+  // Auto-focus the panel for screen readers / keyboard users.
+  const panelEl = panel.querySelector<HTMLElement>(".panel");
+  panelEl?.focus();
 }

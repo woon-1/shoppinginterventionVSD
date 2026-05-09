@@ -2,6 +2,7 @@
 // Runs on etsy.com product pages to extract product data and inject wishlist button
 
 import {
+  attachRouteObserver,
   extractCurrency,
   extractPrice,
   injectButton,
@@ -84,39 +85,17 @@ function initEtsyWishlistButton() {
   }
 }
 
-function routeEtsyFeatures() {
+function tickEtsy(): boolean {
   const ctx = detectCartCheckoutContext("etsy", window.location.href);
   if (ctx.active) {
-    if (!document.querySelector("[data-pause-cart-host]")) {
-      void mountCartIntervention("etsy", ctx.kind);
-    }
-    return;
-  }
-  initEtsyWishlistButton();
-}
-
-// Initialize when DOM is ready
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", routeEtsyFeatures);
-} else {
-  routeEtsyFeatures();
-}
-
-// Also try to initialize on dynamic content changes
-const observer = new MutationObserver(() => {
-  const ctx = detectCartCheckoutContext("etsy", window.location.href);
-  if (ctx.active) {
-    if (!document.querySelector("[data-pause-cart-host]")) {
-      void mountCartIntervention("etsy", ctx.kind);
-    }
-    return;
+    if (document.querySelector("[data-pause-cart-host]")) return true;
+    void mountCartIntervention("etsy", ctx.kind);
+    return false;
   }
   if (!document.querySelector("[data-pause-wishlist-button]")) {
     initEtsyWishlistButton();
   }
-});
+  return Boolean(document.querySelector("[data-pause-wishlist-button]"));
+}
 
-observer.observe(document.body, {
-  childList: true,
-  subtree: true,
-});
+attachRouteObserver(tickEtsy);
