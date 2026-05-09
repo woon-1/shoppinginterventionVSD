@@ -99,6 +99,54 @@ export function findAlternatives(
     .slice(0, 3);
 }
 
+/**
+ * Which footer action the modal should label as RECOMMENDED, given the cart's
+ * fit against the user's remaining budget and chosen friction. A $1 drink with
+ * $50 left this week shouldn't be told to wait 24 hours — that's
+ * paternalistic. A cart that swallows half the remaining budget should.
+ *
+ * Returns null when neither action is clearly better — the modal hides the
+ * label rather than picking arbitrarily.
+ */
+export type Recommendation = "buy" | "save" | null;
+
+export interface RecommendationInput {
+  cartTotal: number | null;
+  remaining: number | null;
+  friction: FrictionLevel;
+}
+
+export function deriveRecommendation({
+  cartTotal,
+  remaining,
+  friction,
+}: RecommendationInput): Recommendation {
+  // No budget context — only strict friction has a clear default posture.
+  if (cartTotal == null || remaining == null) {
+    return friction === "strict" ? "save" : null;
+  }
+
+  // Already over budget — clear save signal regardless of friction.
+  if (cartTotal > remaining) return "save";
+
+  const ratio = remaining > 0 ? cartTotal / remaining : 1;
+
+  // Tiny purchase relative to remaining — don't moralize a $1 drink even on
+  // strict mode. The cart-size signal beats friction posture here.
+  if (ratio < 0.1) return "buy";
+
+  // Cart claims half or more of remaining budget — meaningful chunk, save
+  // regardless of friction.
+  if (ratio >= 0.5) return "save";
+
+  // Middle band (10–50%) — friction posture decides.
+  if (friction === "strict") return "save";
+  if (friction === "light") return "buy";
+
+  // Standard friction in the middle band — stay neutral, hide the label.
+  return null;
+}
+
 export type InterventionState =
   | "initialPause"
   | "contextFraming"

@@ -18,6 +18,10 @@ const buttonVariants = cva(
         destructive:
           "bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40",
         link: "text-primary underline-offset-4 hover:underline",
+        // Pause design system
+        accent: "bg-accent text-white hover:bg-accent/90",
+        "link-mono":
+          "h-auto px-0 font-mono text-[11px] tracking-[0.02em] text-ink-3 underline-offset-4 hover:text-ink hover:underline",
       },
       size: {
         default:

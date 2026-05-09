@@ -5,7 +5,6 @@ import {
   Bookmark,
   Clock,
   LayoutDashboard,
-  Leaf,
   PauseCircle,
   Settings,
   ShoppingCart,
@@ -14,12 +13,22 @@ import {
 } from "lucide-react";
 import { useAppState } from "@/context/AppStateContext";
 import { remainingBudget } from "@/lib/budget";
-import { formatCurrency, formatRelativeTime } from "@/lib/format";
+import { formatRelativeTime } from "@/lib/format";
 import { UserConfig } from "@/lib/types";
 import { HintTooltip } from "@/components/ui/hint-tooltip";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { extensionFullPageLinkProps } from "@/lib/extension-url";
+import {
+  AccentDot,
+  BrandMark,
+  Card,
+  CardBody,
+  CardHeader,
+  Eyebrow,
+  Money,
+  Pill,
+} from "@/components/pause";
 
 const REFLECTION_PROMPTS = [
   "Do I need this?",
@@ -36,6 +45,17 @@ function frictionLabel(config: UserConfig): string {
       return "Stronger nudge — save-for-later is highlighted.";
     default:
       return "Balanced — reflection with clear choices.";
+  }
+}
+
+function frictionPillLabel(config: UserConfig): string {
+  switch (config.friction) {
+    case "light":
+      return "Light";
+    case "strict":
+      return "Strict";
+    default:
+      return "Standard";
   }
 }
 
@@ -76,76 +96,61 @@ export function PopupActive() {
 
   return (
     <div className="box-border w-full min-w-0 max-w-full space-y-4 px-3 py-4 text-ink">
-      <header className="flex items-start gap-2">
-        <Leaf className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden />
-        <div className="min-w-0 space-y-1">
-          <div className="flex items-center justify-between gap-2">
-            <h1 className="text-[15px] font-semibold tracking-tight">Pause</h1>
-            {config.demoMode ? (
-              <span className="shrink-0 rounded border border-ink-4 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide text-ink-3">
-                Demo
-              </span>
-            ) : null}
-          </div>
-          <p className="text-[11px] leading-relaxed text-ink-3">
-            You choose when to pause — we support the decision, not shame it.
-          </p>
-        </div>
-      </header>
+      <BrandMark
+        trailing={
+          <Pill variant="outline">
+            {config.demoMode ? "Demo" : frictionPillLabel(config)}
+          </Pill>
+        }
+      />
 
       {/* Pause status */}
-      <section
-        className="rounded-xl border border-ink-4 bg-paper px-3 py-3"
-        aria-label="Spending pause status"
-      >
-        <div className="flex min-w-0 items-center justify-between gap-2 text-[11px] font-medium uppercase tracking-[0.06em] text-ink-3">
-          <span className="flex min-w-0 flex-1 items-center gap-1">
+      <Card aria-label="Spending pause status">
+        <CardHeader>
+          <Eyebrow as="span" className="flex min-w-0 flex-1 items-center gap-1">
             Pause status
             <HintTooltip content="Shows discretionary budget room left this period. Essentials use their own path in the demo shop." />
-          </span>
-          <span
-            className={cn(
-              "shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px] normal-case tracking-normal",
-              withinBudget
-                ? "bg-accent-fade text-ink"
-                : "bg-negative/10 text-negative"
-            )}
-          >
-            {withinBudget ? "Within budget" : "Over budget line"}
-          </span>
-        </div>
-        <div className="mt-2 break-words font-mono text-[20px] font-medium tabular-nums text-ink">
-          {formatCurrency(remaining)}{" "}
-          <span className="text-[12px] font-normal text-ink-3">
-            left of {formatCurrency(config.budgetAmount)}
-          </span>
-        </div>
-        <div className="mt-2 h-1 w-full overflow-hidden rounded bg-ink-4">
-          <div
-            className="h-full bg-ink transition-[width]"
-            style={{ width: `${Math.min(100, spentPct)}%` }}
-          />
-        </div>
-        <p className="mt-2 text-[11px] leading-snug text-ink-2">
-          {frictionLabel(config)}
-        </p>
-      </section>
+          </Eyebrow>
+          <Pill variant={withinBudget ? "accent" : "negative"}>
+            {withinBudget ? "Within budget" : "Over budget"}
+          </Pill>
+        </CardHeader>
+        <CardBody>
+          <div className="break-words text-[20px] font-medium tabular-nums text-ink">
+            <Money amount={remaining} className="text-[20px] text-ink" />{" "}
+            <span className="text-[12px] font-normal text-ink-3">
+              left of <Money amount={config.budgetAmount} />
+            </span>
+          </div>
+          <div className="mt-2 h-1 w-full overflow-hidden rounded bg-ink-4">
+            <div
+              className="h-full bg-ink transition-[width]"
+              style={{ width: `${Math.min(100, spentPct)}%` }}
+            />
+          </div>
+          <p className="mt-2 text-[11px] leading-snug text-ink-2">
+            {frictionLabel(config)}
+          </p>
+        </CardBody>
+      </Card>
 
       {/* Cooling-off */}
       {pending.length > 0 && nextCoolingDeadline ? (
-        <section className="flex min-w-0 items-start gap-2 rounded-xl border border-ink-4 bg-surface px-3 py-2.5 text-[12px]">
-          <Clock className="mt-0.5 size-4 shrink-0 text-ink-3" aria-hidden />
-          <div className="min-w-0">
-            <div className="font-medium text-ink">
-              Cooling off · {pending.length} item
-              {pending.length === 1 ? "" : "s"}
+        <Card>
+          <CardBody className="flex min-w-0 items-start gap-2 text-[12px]">
+            <Clock className="mt-0.5 size-4 shrink-0 text-ink-3" aria-hidden />
+            <div className="min-w-0">
+              <div className="font-medium text-ink">
+                Cooling off · {pending.length} item
+                {pending.length === 1 ? "" : "s"}
+              </div>
+              <div className="mt-0.5 font-mono text-[11px] text-ink-2">
+                Next window closes in{" "}
+                {formatRelativeTime(nextCoolingDeadline - now)}
+              </div>
             </div>
-            <div className="mt-0.5 font-mono text-[11px] text-ink-2">
-              Next window closes in{" "}
-              {formatRelativeTime(nextCoolingDeadline - now)}
-            </div>
-          </div>
-        </section>
+          </CardBody>
+        </Card>
       ) : null}
 
       {/* Pause before buying */}
@@ -166,15 +171,15 @@ export function PopupActive() {
         </div>
 
         {showPauseKit ? (
-          <div className="rounded-xl border border-accent/30 bg-accent-fade/50 px-3 py-3">
-            <div className="mb-2 flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.06em] text-ink-3">
+          <div className="rounded-md border border-accent/30 bg-accent-fade/50 px-3 py-3">
+            <Eyebrow className="mb-2 flex items-center gap-1.5">
               <Sparkles className="size-3.5" aria-hidden />
               Quick reflection
-            </div>
+            </Eyebrow>
             <ul className="space-y-2 text-[12px] leading-snug text-ink-2">
               {REFLECTION_PROMPTS.map((q) => (
-                <li key={q} className="flex gap-2">
-                  <span className="text-accent">·</span>
+                <li key={q} className="flex items-start gap-2">
+                  <AccentDot className="mt-1.5" />
                   <span>{q}</span>
                 </li>
               ))}
@@ -188,9 +193,7 @@ export function PopupActive() {
 
       {/* Full page links */}
       <section className="space-y-2 border-t border-ink-4 pt-3">
-        <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-ink-3">
-          Open full pages
-        </p>
+        <Eyebrow size="xs">Open full pages</Eyebrow>
         <div className="flex flex-col gap-1.5">
           <a
             {...extensionFullPageLinkProps("dashboard.html")}

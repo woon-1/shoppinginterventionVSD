@@ -8,6 +8,7 @@ import {
   CartBreakdown,
   breakdownCart,
   decideIntervention,
+  deriveRecommendation,
   findAlternatives,
 } from "@/lib/intervention";
 import { remainingBudget, periodLabel } from "@/lib/budget";
@@ -30,6 +31,12 @@ import {
   type AdaptiveIntervention,
   type CartInterventionPayload,
 } from "@/lib/intervention-behavior";
+import {
+  AccentDot,
+  Eyebrow,
+  Money,
+  Pill,
+} from "@/components/pause";
 
 interface Props {
   open: boolean;
@@ -109,13 +116,6 @@ export function InterventionModal({ open, onOpenChange }: Props) {
   );
   const requiresJustification =
     adaptive?.requireJustification ?? decision.level === "strict";
-  const tone =
-    adaptive?.headlineTone ??
-    (decision.level === "light"
-      ? "gentle"
-      : decision.level === "strict"
-        ? "firm"
-        : "direct");
   const canProceed = !requiresJustification || justification.trim().length > 0;
 
   if (effectiveFriction === "light") {
@@ -205,6 +205,11 @@ export function InterventionModal({ open, onOpenChange }: Props) {
   }
 
   const isStrict = effectiveFriction === "strict";
+  const recommendation = deriveRecommendation({
+    cartTotal: breakdown.nonEssentialsTotal,
+    remaining,
+    friction: effectiveFriction,
+  });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -212,77 +217,52 @@ export function InterventionModal({ open, onOpenChange }: Props) {
         className="max-w-md gap-0 overflow-hidden rounded-md border border-ink-4 bg-surface p-0 shadow-none"
         showCloseButton={false}
       >
-        {/* Header strip */}
-        <div className="flex items-center justify-between border-b border-ink-4 px-5 py-3">
-          <DialogTitle className="flex items-center gap-1.5 text-[14px] font-semibold tracking-tight text-ink">
-            Pause<span className="size-1 rounded-[1px] bg-accent" />
+        {/* Header */}
+        <div className="flex items-center justify-between gap-2 border-b border-ink-4 px-5 py-3">
+          <DialogTitle className="flex items-center gap-1.5">
+            <span className="text-[15px] font-semibold tracking-tight text-ink">
+              Pause
+            </span>
+            <span
+              aria-hidden
+              className="size-1 shrink-0 rounded-[1px] bg-accent"
+            />
           </DialogTitle>
-          <span className="rounded border border-ink-4 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.06em] text-ink-2">
-            {isStrict ? "Strict" : "Standard"}
-          </span>
+          <Pill variant="outline">{isStrict ? "Strict" : "Standard"}</Pill>
         </div>
 
         <div className="space-y-5 px-5 py-5">
-          <div className="space-y-2 rounded-md border border-ink-4 bg-white px-4 py-3">
-            <div className="flex items-center justify-between gap-3">
-              <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-ink-3">
-                Goal first
-              </span>
-              <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-accent">
-                {tone}
-              </span>
-            </div>
-            <div className="flex items-end justify-between gap-4">
-              <div>
-                <div className="text-[28px] font-semibold leading-none tracking-[-0.04em] text-ink num-tabular">
-                  {formatCurrency(config.budgetAmount - remaining)}
-                </div>
-                <p className="mt-1 text-[12px] text-ink-2">
-                  already committed in this budget period.
-                </p>
-              </div>
-              {config.savingsGoal ? (
-                <div className="text-right">
-                  <div className="text-[12px] font-medium text-ink">
-                    {config.savingsGoal.label}
-                  </div>
-                  <div className="font-mono text-[11px] text-ink-3">
-                    {formatCurrency(config.savingsGoal.amount)} goal
-                  </div>
-                </div>
-              ) : null}
-            </div>
-            {adaptive?.explanation ? (
-              <p className="text-[12px] text-ink-2">{adaptive.explanation}</p>
-            ) : null}
-          </div>
-
-          {/* Trigger */}
+          {/* Trigger line */}
           <div className="flex items-start gap-2">
-            <span className="mt-1.5 size-1 shrink-0 rounded-[1px] bg-accent" />
-            <p className="text-[13px] leading-relaxed text-ink">
-              {formatCurrency(breakdown.nonEssentialsTotal)} in cart,{" "}
-              <span className="font-mono num-tabular">
-                {formatCurrency(remaining)}
-              </span>{" "}
+            <AccentDot className="mt-2" />
+            <p className="text-[14px] leading-relaxed text-ink">
+              <Money amount={breakdown.nonEssentialsTotal} className="text-[14px] text-ink" />{" "}
+              in cart,{" "}
+              <Money amount={remaining} className="text-[14px] text-ink" />{" "}
               left {periodLabel(config.budgetPeriod)}.
               {overBudget && (
                 <>
-                  {" "}
+                  <br />
                   <span className="text-negative">Over budget.</span>
                 </>
               )}
             </p>
           </div>
 
-          {/* Compact budget meter */}
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between font-mono text-[11px] num-tabular text-ink-3">
-              <span>{formatCurrency(spent)}</span>
-              <span className="text-ink-2">{formatCurrency(projectedSpent)}</span>
-              <span>{formatCurrency(config.budgetAmount)}</span>
+          {/* Budget bar with prominent labels */}
+          <div className="space-y-3">
+            <div className="grid grid-cols-3 items-end text-[13px] num-tabular">
+              <span className="text-left font-mono text-ink-3">
+                {formatCurrency(spent)}
+              </span>
+              <span className="text-center font-mono text-[15px] font-medium text-ink">
+                {formatCurrency(projectedSpent)}
+              </span>
+              <span className="text-right font-mono text-ink-3">
+                {formatCurrency(config.budgetAmount)}
+              </span>
             </div>
-            <div className="relative h-1 w-full bg-surface-2">
+            <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-ink-4/40">
               <div
                 className="absolute inset-y-0 left-0 bg-ink-3"
                 style={{ width: `${spentPct}%` }}
@@ -298,18 +278,16 @@ export function InterventionModal({ open, onOpenChange }: Props) {
                 }}
               />
               <div
-                className="absolute -top-0.5 h-2 w-px bg-ink"
+                className="absolute -top-0.5 h-2.5 w-px bg-ink"
                 style={{ left: `${projectedPct}%` }}
               />
             </div>
           </div>
 
-          {/* Necessity */}
-          <div className="space-y-2">
-            <span className="font-mono text-[11px] uppercase tracking-[0.06em] text-ink-3">
-              Why?
-            </span>
-            <div role="radiogroup" className="grid grid-cols-3 gap-1.5">
+          {/* Why? */}
+          <div className="space-y-2.5">
+            <Eyebrow>Why?</Eyebrow>
+            <div role="radiogroup" className="grid grid-cols-3 gap-2">
               {NECESSITY_OPTIONS.map((opt) => {
                 const active = necessity === opt.value;
                 return (
@@ -320,10 +298,10 @@ export function InterventionModal({ open, onOpenChange }: Props) {
                     aria-checked={active}
                     onClick={() => setNecessity(opt.value)}
                     className={cn(
-                      "h-8 rounded border px-2 text-[12px] font-medium transition-colors",
+                      "h-11 rounded-md border text-[14px] font-medium transition-colors",
                       active
                         ? "border-accent bg-accent-fade text-accent"
-                        : "border-ink-4 bg-surface text-ink-2 hover:border-ink hover:text-ink"
+                        : "border-ink-4 bg-surface text-ink hover:border-ink"
                     )}
                   >
                     {opt.label}
@@ -333,13 +311,11 @@ export function InterventionModal({ open, onOpenChange }: Props) {
             </div>
             {requiresJustification && (
               <div className="space-y-2 pt-2">
-                <label className="font-mono text-[11px] uppercase tracking-[0.06em] text-ink-3">
-                  One sentence: why now?
-                </label>
+                <Eyebrow as="label">One sentence: why now?</Eyebrow>
                 <textarea
                   value={justification}
                   onChange={(e) => setJustification(e.target.value)}
-                  className="min-h-20 w-full rounded border border-ink-4 bg-surface px-3 py-2 text-[13px] text-ink outline-none transition-colors focus:border-accent"
+                  className="min-h-20 w-full rounded-md border border-ink-4 bg-surface px-3 py-2 text-[13px] text-ink outline-none transition-colors focus:border-accent"
                   placeholder="What makes this worth buying today?"
                 />
               </div>
@@ -349,9 +325,7 @@ export function InterventionModal({ open, onOpenChange }: Props) {
           {/* Alternatives */}
           {showAlternatives && (
             <div className="space-y-2 border-t border-ink-4 pt-4">
-              <span className="font-mono text-[11px] uppercase tracking-[0.06em] text-ink-3">
-                Cheaper alternatives
-              </span>
+              <Eyebrow>Cheaper alternatives</Eyebrow>
               {alternatives.length === 0 ? (
                 <p className="font-mono text-[12px] text-ink-3">
                   None within budget. Save for 24h instead.
@@ -407,48 +381,43 @@ export function InterventionModal({ open, onOpenChange }: Props) {
         </div>
 
         {/* Action footer */}
-        <div className="flex flex-col gap-2 border-t border-ink-4 bg-surface-2/50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-          {!showAlternatives ? (
-            <button
-              type="button"
-              onClick={() => setShowAlternatives(true)}
-              className="text-left font-mono text-[11px] text-ink-3 hover:text-ink hover:underline"
-            >
-              See alternatives →
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setShowAlternatives(false)}
-              className="text-left font-mono text-[11px] text-ink-3 hover:text-ink hover:underline"
-            >
-              ← Back
-            </button>
-          )}
+        <div className="flex items-center justify-between gap-3 border-t border-ink-4 bg-surface-2/50 px-5 py-3">
+          <button
+            type="button"
+            onClick={() => setShowAlternatives((v) => !v)}
+            className="font-mono text-[12px] text-ink-3 transition-colors hover:text-ink hover:underline"
+          >
+            {showAlternatives ? "← Back" : "See alternatives →"}
+          </button>
 
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
+          <div className="flex items-center gap-3">
+            {recommendation === "buy" && (
+              <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-accent">
+                Recommended
+              </span>
+            )}
+            <button
+              type="button"
               onClick={handleBuy}
               disabled={!canProceed}
-              className="text-ink-2 hover:bg-surface-2 hover:text-ink"
+              className="text-[14px] font-medium text-ink transition-colors hover:underline disabled:cursor-not-allowed disabled:text-ink-3"
             >
-              Buy now
+              Buy
+            </button>
+            {recommendation === "save" && (
+              <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-accent">
+                Recommended
+              </span>
+            )}
+            <Button
+              variant="accent"
+              size="lg"
+              onClick={handleSave}
+              disabled={!canProceed}
+              className="px-4"
+            >
+              Save for 24h
             </Button>
-            <div className="flex items-center gap-1.5">
-              {isStrict && (
-                <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-accent">
-                  Recommended
-                </span>
-              )}
-              <Button
-                onClick={handleSave}
-                disabled={!canProceed}
-                className="bg-accent text-white hover:bg-accent/90"
-              >
-                Save for 24h
-              </Button>
-            </div>
           </div>
         </div>
       </DialogContent>
